@@ -3199,10 +3199,6 @@ $($($GlobalState.userInput).trim())
     }
     #endregion QAE-pydev
 
-    #region PSScriptAnalyzer
-    Invoke-AnalyzeCodeWithPSScriptAnalyzer -InputString $($PythonDeveloper.GetLastMemory().Response) -Role $PythonDeveloper -GlobalState $GlobalState
-    #endregion PSScriptAnalyzer
-
     #region Doc
     if (-not $GlobalState.NODocumentator) {
         if (-not $GlobalState.NOLog) {
