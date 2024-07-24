@@ -624,17 +624,17 @@ function Add-ToGlobalResponses {
     $GlobalState.GlobalResponse += $response
 }
 
-function Add-ToGlobalPSDevResponses {
+function Add-ToGlobalpydevResponses {
     param (
         [Parameter()]
         [PSCustomObject] 
         $GlobalState, # The global state object to update
     
-        $response  # The response to add to the global PSDev responses
+        $response  # The response to add to the global pydev responses
     )
     
-    # Append the response to the GlobalPSDevResponse property of the GlobalState object
-    $GlobalState.GlobalPSDevResponse += $response
+    # Append the response to the GlobalpydevResponse property of the GlobalState object
+    $GlobalState.GlobalpydevResponse += $response
 }
 
 function New-FolderAtPath {
@@ -883,23 +883,6 @@ function Get-FeedbackPrompt {
         [string]$code
     )
 
-
-    $FeedbackUserprompt = @"
-Your task is write review of the Python code.
-
-Description and objectives:
-````````text
-$($description.trim())
-````````
-
-The code:
-``````Python
-$code
-``````
-
-Show paragraph style review with your suggestions for improvement of the code to Python Developer. Think step by step, make sure your answer is unbiased. Use reliable sources like official documentation, research papers from reputable institutions, or widely used textbooks. Possibly join a list of verification questions that could help to analyze. 
-"@
-
     $FeedbackUserprompt = @"
 
 Based on the following user requirements and existing Python code, prepare comprehensive guidelines for a Python Developer to improve or extend the script:
@@ -914,11 +897,11 @@ Current Python code:
 $($code.trim())
 ``````
 
-Please analyze these requirements and the existing code, then create detailed guidelines that will enable the Python Developer to effectively implement improvements or extensions to the script. Consider the following in your analysis:
+Analyze these requirements and the existing code, then create detailed guidelines that will enable the Python Developer to effectively implement improvements or extensions to the script. Consider the following in your analysis:
 
 1. How well the current code meets the user requirements
 2. Areas of the code that need improvement or refactoring
-3. New functionalities that need to be added
+3. New functionalities that could to be added
 4. Any potential issues or limitations in the current implementation
 5. Opportunities to enhance performance, readability, or maintainability
 
@@ -942,7 +925,7 @@ function Set-FeedbackAndGenerateResponse {
     )
     try {
         # Generate the feedback prompt using the provided description and code
-        $feedbackPrompt = Get-FeedbackPrompt -description $GlobalState.UserInput -code $GlobalState.LastPSDevCode
+        $feedbackPrompt = Get-FeedbackPrompt -description $GlobalState.UserInput -code $GlobalState.LastpydevCode
 
         # If RAG (Retrieve and Generate) is enabled, append RAG data to the feedback prompt
         if ($GlobalState.RAG) {
@@ -962,9 +945,6 @@ function Set-FeedbackAndGenerateResponse {
 
         # Add the feedback to global responses
         Add-ToGlobalResponses -GlobalState $GlobalState -response $feedback
-
-        # Generate the response based on the feedback
-        #$responsePrompt = "Modify Python code with suggested improvements and optimizations based on $($Reviewer.Name) review. The previous version of the code has been shared below after the feedback block.`n`n````````text`n" + $($Reviewer.GetLastMemory().Response) + "`n`````````n`nHere is previous version of the code:`n`n``````python`n$($GlobalState.LastPSDevCode)`n```````n`nShow the new version of Python code. Think step by step. Make sure your answer is unbiased. Use reliable sources like official documentation, research papers from reputable institutions, or widely used textbooks."
 
         $responsePrompt = @"
 
@@ -993,7 +973,7 @@ $($Reviewer.GetLastMemory().Response)
 
 Current version of the Python code:
 ````````python
-$($GlobalState.LastPSDevCode)
+$($GlobalState.LastpydevCode)
 ````````
 "@
         # If a tip amount is specified, include it in the response prompt
@@ -1021,7 +1001,7 @@ function Update-GlobalStateWithResponse {
 
     try {
         # Update the global response with the new response
-        $GlobalState.GlobalPSDevResponse += $response
+        $GlobalState.GlobalpydevResponse += $response
 
         # Add the new response to global responses
         Add-ToGlobalResponses -GlobalState $GlobalState -response $response
@@ -1031,7 +1011,7 @@ function Update-GlobalStateWithResponse {
 
         if ((Test-Path -Path $_savedFile) -and $_savedFile) {
             # Update the last code and file version
-            $GlobalState.lastPSDevCode = Get-Content -Path $_savedFile -Raw
+            $GlobalState.lastpydevCode = Get-Content -Path $_savedFile -Raw
             $GlobalState.fileVersion += 1
 
             # Output the saved file path for verbose logging
@@ -1103,52 +1083,6 @@ function Save-AndUpdateCode {
     }
 }
 
-function Save-AndUpdateCode2 {
-    <#
-    .SYNOPSIS
-    Saves the updated code to a file and updates the last code and file version.
-
-    .DESCRIPTION
-    This function takes the response string, saves it to a file with a versioned filename, 
-    updates the last code content, increments the file version, and logs the saved file path.
-
-    .PARAMETER response
-    The response string containing the updated code to be saved.
-
-    .PARAMETER GlobalState
-    GlobalState
-
-    .EXAMPLE
-    Save-AndUpdateCode -response $response -lastCode ([ref]$lastCode) -fileVersion ([ref]$fileVersion) -teamDiscussionDataFolder "C:\TeamData"
-    #>
-
-    param (
-        [string] $response, # The updated code to be saved
-        [PSCustomObject] $GlobalState
-    )
-    try {
-        # Save the response to a versioned file
-        $_savedFile = Export-AndWritePythonCodeBlocks -InputString $response -OutputFilePath $(join-path $GlobalState.teamDiscussionDataFolder "TheCode_v$($GlobalState.fileVersion).py") -StartDelimiter '```python' -EndDelimiter '```'
-    
-        if (Test-Path -Path $_savedFile) {
-            # Update the last code content with the saved file content
-            $GlobalState.lastPSDevCode = Get-Content -Path $_savedFile -Raw 
-            # Increment the file version number
-            $GlobalState.fileVersion += 1
-            # Log the saved file path for verbose output
-            Write-Verbose $_savedFile
-        }
-        else {
-            Write-Error "The file $_savedFile does not exist."
-        }
-    }
-    catch [System.Exception] {
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
-    }
-
-}
-
 function Save-ProjectState {
     param (
         [string]$FilePath, # Path to save the project state
@@ -1157,65 +1091,6 @@ function Save-ProjectState {
     try {
         # Export the project state to a file in XML format
         $GlobalState | Export-Clixml -Path $FilePath
-    }    
-    catch [System.Exception] {
-        # Handle any exceptions that occur during the save process
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
-    }
-}
-
-function Save-ProjectState_old2 {
-    param (
-        [string]$FilePath, # Path to save the project state
-        [PSCustomObject] $GlobalState  # Global state object containing project details
-    )
-    try {
-        # Create a hashtable to store the project state dynamically
-        $projectState = @{}
-        $GlobalState | Get-Member -MemberType Properties | ForEach-Object {
-            $projectState[$_.Name] = $GlobalState."$($_.Name)"
-        }
-        
-        # Export the project state to a file in XML format
-        $projectState | Export-Clixml -Path $FilePath
-    }    
-    catch [System.Exception] {
-        # Handle any exceptions that occur during the save process
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
-    }
-}
-
-function Save-ProjectState_old {
-    param (
-        [string]$FilePath, # Path to save the project state
-        [PSCustomObject] $GlobalState  # Global state object containing project details
-    )
-    try {
-        # Create a hashtable to store the project state
-        $projectState = @{
-            LastPSDevCode            = $GlobalState.lastPSDevCode            # Last Python Developer code
-            FileVersion              = $GlobalState.FileVersion              # Current file version
-            GlobalPSDevResponse      = $GlobalState.GlobalPSDevResponse      # Global Python Developer responses
-            GlobalResponse           = $GlobalState.GlobalResponse           # Global responses
-            TeamDiscussionDataFolder = $GlobalState.TeamDiscussionDataFolder # Folder for team discussion data
-            UserInput                = $GlobalState.userInput                # User input
-            OrgUserInput             = $GlobalState.OrgUserInput             # Original user input
-            LogFolder                = $GlobalState.LogFolder                # Folder for logs
-            MaxTokens                = $GlobalState.MaxTokens                # Maximum number of tokens
-            VerbosePrompt            = $GlobalState.VerbosePrompt            # Verbose prompt flag
-            NOTips                   = $GlobalState.NOTips                   # Disable tips flag
-            NOLog                    = $GlobalState.NOLog                    # Disable logging flag
-            NODocumentator           = $GlobalState.NODocumentator           # Disable documentator flag
-            NOPM                     = $GlobalState.NOPM                     # Disable project manager flag
-            RAG                      = $GlobalState.RAG                      # RAG (Retrieve and Generate) functionality flag
-            Stream                   = $GlobalState.Stream                   # Stream output flag
-            LLMProvider              = $GlobalState.LLMProvider              # LLM provide name
-        }
-        
-        # Export the project state to a file in XML format
-        $projectState | Export-Clixml -Path $FilePath
     }    
     catch [System.Exception] {
         # Handle any exceptions that occur during the save process
@@ -1251,81 +1126,6 @@ function Get-ProjectState {
     }
 }
 
-function Get-ProjectState_old {
-    param (
-        [string]$FilePath
-    )
-    try {
-        # Check if the specified file path exists
-        if (Test-Path -Path $FilePath) {
-            # Import the project state from the XML file
-            $projectState = Import-Clixml -Path $FilePath
-            
-            # Get keys and values from projectState and create GlobalState
-            $GlobalState = [PSCustomObject]@{}
-            $projectState.PSObject.Properties | ForEach-Object {
-                $GlobalState | Add-Member -MemberType NoteProperty -Name $_.Name -Value $_.Value
-            }
-            
-            # Return the updated GlobalState object
-            return $GlobalState
-        }
-        else {
-            # Inform the user that the project state file was not found
-            Write-Host "-- Project state file not found."
-        }
-    }    
-    catch [System.Exception] {
-        # Handle any exceptions that occur during the process
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path (split-path -Path $FilePath -Parent) "ERROR.txt")  
-    }
-}
-
-function Get-ProjectState_old {
-    param (
-        [string]$FilePath
-    )
-    try {
-        # Check if the specified file path exists
-        if (Test-Path -Path $FilePath) {
-            # Import the project state from the XML file
-            $projectState = Import-Clixml -Path $FilePath
-            
-            # Update the GlobalState object with the imported project state values
-            $GlobalState.LastPSDevCode = $projectState.LastPSDevCode
-            $GlobalState.FileVersion = $projectState.FileVersion
-            $GlobalState.GlobalPSDevResponse = $projectState.GlobalPSDevResponse
-            $GlobalState.TeamDiscussionDataFolder = $projectState.TeamDiscussionDataFolder
-            $GlobalState.userInput = $projectState.UserInput
-            $GlobalState.GlobalResponse = $projectState.GlobalResponse
-            $GlobalState.OrgUserInput = $projectState.OrgUserInput
-            $GlobalState.LogFolder = $projectState.LogFolder
-            $GlobalState.MaxTokens = $projectState.MaxTokens
-            $GlobalState.VerbosePrompt = $projectState.VerbosePrompt
-            $GlobalState.NOTips = $projectState.NOTips
-            $GlobalState.NOLog = $projectState.NOLog
-            $GlobalState.NODocumentator = $projectState.NODocumentator
-            $GlobalState.NOPM = $projectState.NOPM
-            $GlobalState.RAG = $projectState.RAG
-            $GlobalState.Stream = $projectState.Stream
-            $GlobalState.LLMProvider = $projectState.LLMProvider
-            
-            # Return the updated GlobalState object
-            return $GlobalState
-        }
-        else {
-            # Inform the user that the project state file was not found
-            Write-Host "-- Project state file not found."
-        }
-    }    
-    catch [System.Exception] {
-        # Handle any exceptions that occur during the process
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
-    }
-}
-
 function Update-ErrorHandling {
     param (
         [Parameter(Mandatory = $true)]
@@ -1338,9 +1138,6 @@ function Update-ErrorHandling {
 
     # Provide suggestions based on the error type
     $suggestions = switch -Regex ($ErrorRecord.Exception.Message) {
-        "PSScriptAnalyzer" {
-            "Ensure the PSScriptAnalyzer module is installed and up-to-date. Use 'Install-Module -Name PSScriptAnalyzer' or 'Update-Module -Name PSScriptAnalyzer'."
-        }
         "PSAOAI" {
             "Check the PSAOAI module installation and the deployment environment variable. Ensure the API key and endpoint are correctly configured."
         }
@@ -1363,23 +1160,20 @@ function Update-ErrorHandling {
 
     # Capture detailed error information
     $errorDetails = [ordered]@{
-        Timestamp         = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        ErrorMessage      = $ErrorRecord.Exception.Message
-        ExceptionType     = $ErrorRecord.Exception.GetType().FullName
-        ErrorContext      = $ErrorContext
-        Suggestions       = $Suggestions
-        ScriptFullName    = $MyInvocation.ScriptName
-        LineNumber        = $MyInvocation.ScriptLineNumber
-        StackTrace        = $ErrorRecord.ScriptStackTrace
-        UserName          = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-        MachineName       = $env:COMPUTERNAME
-        PythonVersion = $PSVersionTable.PSVersion.ToString()
-
+        Timestamp      = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        ErrorMessage   = $ErrorRecord.Exception.Message
+        ExceptionType  = $ErrorRecord.Exception.GetType().FullName
+        ErrorContext   = $ErrorContext
+        Suggestions    = $Suggestions
+        ScriptFullName = $MyInvocation.ScriptName
+        LineNumber     = $MyInvocation.ScriptLineNumber
+        StackTrace     = $ErrorRecord.ScriptStackTrace
+        UserName       = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+        MachineName    = $env:COMPUTERNAME
+        PythonVersion  = $PSVersionTable.PSVersion.ToString()
     } | ConvertTo-Json
 
-
     # Display the error details and suggestions
-    #Write-Host "-- Error: $($ErrorRecord.Exception.Message)"
     Write-Host "-- Context: $ErrorContext" -ForegroundColor Yellow
     Write-Host "-- Suggestions: $suggestions" -ForegroundColor Yellow
     Write-Host "-- Error: $($ErrorRecord.Exception.Message)" -ForegroundColor Yellow
@@ -1936,64 +1730,49 @@ function Remove-StringDirtyData {
 You are an expert text processor specializing in cleaning and formatting web content. Your task is to process text that originally came from HTML but has already had its HTML tags removed. The text still contains artifacts, irregular spacing, meta content, sidebar content or formatting issues from the HTML removal process. Your goal is to produce clean, readable text.
 
 In your processing you must:
-
 1. Remove all HTML entities (e.g., &nbsp;, &amp;, &#39;) and replace them with their corresponding characters. Use a comprehensive list of HTML entities for reference.
-
 2. Normalize line breaks:
    - Reduce multiple consecutive blank lines to a single blank line for paragraph separation.
    - Preserve intentional line breaks for structured content like addresses, poetry, or code snippets.
    - Remove unnecessary line breaks within paragraphs, joining split sentences.
-
 3. Clean up HTML artifacts:
    - Remove any remaining HTML tags, including partial or malformed tags.
    - Eliminate stray brackets, braces, or other syntax-related characters that don't belong in plain text.
-
 4. Standardize spacing:
    - Ensure single spaces after punctuation marks (periods, commas, colons, etc.).
    - Remove extra spaces between words.
    - Eliminate leading or trailing spaces on each line.
-
 5. Normalize quotation marks and apostrophes:
    - Use straight quotes (' and ") consistently throughout the text.
    - Ensure apostrophes are used correctly for contractions and possessives.
-
 6. Correct capitalization:
    - Capitalize the first letter of each sentence.
    - Preserve intentional capitalization for proper nouns, acronyms, and titles.
-
 7. Remove redundancies:
    - Eliminate repeated words or phrases that likely resulted from improper tag removal or formatting issues.
    - Be cautious not to remove intentional repetition for emphasis or stylistic purposes.
-
 8. Format lists consistently:
    - Identify and standardize bulleted and numbered lists.
    - Ensure consistent indentation and formatting for list items.
    - Convert HTML list structures to plain text equivalents if necessary.
-
 9. Correct spelling and encoding errors:
    - Fix obvious spelling mistakes, especially those resulting from character encoding issues.
    - Be cautious with proper nouns or specialized terminology.
-
 10. Standardize punctuation:
     - Use consistent em-dashes, en-dashes, and hyphens.
     - Ensure correct usage of semicolons, colons, and other punctuation marks.
-
 11. Preserve or convert special formatting:
     - Maintain emphasis (bold, italic) using plain text conventions (e.g., *asterisks* or _underscores_) if appropriate for the output format.
     - Convert simple tables to a readable plain text format if encountered.
-
 12. Handle URLs and email addresses:
     - Ensure hyperlinks are visible and properly formatted in plain text.
     - Preserve the integrity of email addresses and web URLs.
-
 13. Normalize number and date formats:
     - Standardize numerical representations (e.g., consistent use of commas or periods for thousands separators).
     - Use a consistent date format throughout the document.
-
 14. Remove or replace non-printable characters:
     - Eliminate null characters, form feeds, and other control characters.
     - Replace tabs with appropriate spacing.
-
 15. Final consistency check:
     - Ensure overall consistency in formatting choices throughout the document.
     - Verify that the cleaning process hasn't introduced new errors or inconsistencies.
@@ -2007,7 +1786,7 @@ Web content:
 $cleanedString
 ``````
 
-Present the cleaned text only, maintaining its original structure and meaning as much as possible.
+Process and response with cleaned text only, maintaining its original structure and meaning as much as possible.
 "@
 
     # Invoke the LLM to clean the string
@@ -2018,13 +1797,13 @@ Present the cleaned text only, maintaining its original structure and meaning as
         $CleanedString = Invoke-LLMChatCompletion -Provider $GlobalState.LLMProvider `
             -SystemPrompt $LLMSystemPrompt `
             -UserPrompt $LLMUserPrompt `
-            -Temperature 0.7 `
-            -TopP 0.9 `
+            -Temperature 0.1 `
+            -TopP 0.1 `
             -MaxTokens $GlobalState.MaxTokens `
             -Stream $false `
             -LogFolder $GlobalState.TeamDiscussionDataFolder `
-            -DeploymentChat $script.DeploymentChat `
-            -ollamaModel $script.ollamaModel
+            -DeploymentChat $script:DeploymentChat `
+            -ollamaModel $script:ollamaModel
 
         Write-Host "++ Cleaning RAG Raw Data: Finished." -ForegroundColor Cyan
         return $CleanedString
@@ -2140,7 +1919,7 @@ $($userInput.trim())
         # Process the cleaned web results text with the project manager's input processing function
         $RAGuserinput = @"
 
-Please analyze the following text through the lens of this description: '$userinput'
+Please analyze the following text through the lens of Python project with this description: '$userinput'
 
 Text to analyze:
 ````````text
@@ -2448,6 +2227,7 @@ function Start-OllamaModel {
         Write-Host "-- Failed to retrieve model information from /api/tags: $_"
     }
 }
+
 function Test-OllamaInstalled {
     <#
     .SYNOPSIS
@@ -2608,8 +2388,8 @@ if (-not $LoadProjectStatus) {
         TeamDiscussionDataFolder = $null
         GlobalResponse           = @()
         FileVersion              = 1
-        LastPSDevCode            = ""
-        GlobalPSDevResponse      = @()
+        LastpydevCode            = ""
+        GlobalpydevResponse      = @()
         OrgUserInput             = ""
         UserInput                = ""
         LogFolder                = ""
@@ -2666,16 +2446,6 @@ if ($GlobalState.LLMProvider -eq 'ollama' -and (-not $LoadProjectStatus)) {
         } 
     }
 
-    # Check if Ollama is installed
-    #$ollamaInstalled = Test-OllamaInstalled
-    #if (-not $ollamaInstalled) {
-    #    Write-Warning "-- Ollama is not installed. Please install Ollama and ensure it is in your PATH."
-    #    return
-    #}
-    #else {
-    #    Write-Host "++ Ollama is installed at: $ollamaInstalled"
-    #}
-    # Test if the Ollama API is reachable
     if (Test-OllamaAPI) {
         Write-Host "++ Ollama API is reachable."
         
@@ -2694,39 +2464,6 @@ if ($GlobalState.LLMProvider -eq 'ollama' -and (-not $LoadProjectStatus)) {
         Write-Warning "-- Ollama API is not reachable. Please check your Ollama installation and configuration."
         return
     }
-
-    # Check if Ollama is running
-    #$ollamaRunning = Test-OllamaRunning
-    #if (-not $ollamaRunning) {
-    #    Write-Host "-- Ollama is not running. Attempting to start Ollama..." -ForegroundColor Yellow
-    #    if (Start-OllamaInNewConsole) {
-    #        Write-Host "++ Ollama started successfully."
-    #    }
-    #    else {
-    #        Write-Warning "Failed to start Ollama."
-    #        return
-    #    }
-    #}
-    #else {
-    #    Write-Verbose "++ Ollama is running."
-    #}
-
-    # Ensure a model is running
-    #$runningModelOllama = Test-OllamaRunningModel
-    #if ($runningModelOllama) {
-    #    Set-EnvOllamaModel -model $runningModelOllama
-    #}
-    #else {
-    #    if (Start-OllamaModel) {
-    #        $runningModel = Test-OllamaRunningModel -NOInfo
-    #        if ($runningModel) {
-    #            if (Test-EnsureOllamaModelRunning) {
-    #                Set-EnvOllamaModel -model $runningModel
-    #            }
-    #        }
-    #    }
-    #Write-Host "-- No models are currently running in Ollama. Please check your server and settings." -ForegroundColor Red
-    #}
     Write-Host "If you want to change the model, please delete the OLLAMA_MODEL environment variable or set it to your desired value." -ForegroundColor Magenta
 }
 #endregion ollama
@@ -2830,8 +2567,8 @@ if ($LoadProjectStatus) {
         # Output verbose information about the loaded project state
         Write-Verbose "`$GlobalState.TeamDiscussionDataFolder: $($GlobalState.TeamDiscussionDataFolder)"
         Write-Verbose "`$GlobalState.FileVersion: $($GlobalState.FileVersion)"
-        Write-Verbose "`$GlobalState.LastPSDevCode: $($GlobalState.LastPSDevCode)"
-        Write-Verbose "`$GlobalState.GlobalPSDevResponse: $($GlobalState.GlobalPSDevResponse)"
+        Write-Verbose "`$GlobalState.LastpydevCode: $($GlobalState.LastpydevCode)"
+        Write-Verbose "`$GlobalState.GlobalpydevResponse: $($GlobalState.GlobalpydevResponse)"
         Write-Verbose "`$GlobalState.GlobalResponse: $($GlobalState.GlobalResponse)"
         Write-Verbose "`$GlobalState.OrgUserInput: $($GlobalState.OrgUserInput)"
         Write-Verbose "`$GlobalState.UserInput: $($GlobalState.UserInput)"
@@ -2861,9 +2598,7 @@ if ($LoadProjectStatus) {
     }    
     catch [System.Exception] {
         # Handle any exceptions that occur during the loading of the project state
-        #Update-ErrorHandling -ErrorRecord $_ -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
         Update-ErrorHandling -ErrorRecord $_ -LogFilePath (Join-Path (split-path -Path $LoadProjectStatus -Parent) "ERROR.txt")
-        
     }
 }
 else {
@@ -2887,12 +2622,12 @@ else {
         }
         if ($GlobalState.TeamDiscussionDataFolder) {
             # Output information about the created team discussion folder
-            Write-Information "++ Team discussion folder was created '$($GlobalState.TeamDiscussionDataFolder)'" -InformationAction Continue
+            Write-Information "++ Team folder was created '$($GlobalState.TeamDiscussionDataFolder)'" -InformationAction Continue
         }
     }
     Catch {
         # Handle any exceptions that occur during the creation of the discussion folder
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "Create discussion folder" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
+        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "Create folder" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")
 
         return $false
     }
@@ -2918,6 +2653,8 @@ $requirementsAnalyst = [ProjectTeam]::new(
     @"
 You are an expert Python {0} with extensive experience in software development, system administration, and IT infrastructure. Your role is to analyze user requirements and prepare clear, actionable guidelines for Python Developers.
 
+Before providing guidelines, ensure you fully understand the user's business context, industry-specific requirements, and any regulatory considerations that may impact the project.
+
 When creating guidelines, consider the following aspects:
 1. Script purpose and functionality
 2. Input parameters and data types
@@ -2929,22 +2666,39 @@ When creating guidelines, consider the following aspects:
 8. Integration with existing systems or scripts
 9. Testing and validation criteria
 10. Documentation requirements
+11. Stakeholder needs and concerns
+12. Scalability and future-proofing
+13. Risk assessment and mitigation
+14. User experience (if applicable)
+15. Data management and protection
+16. Monitoring and maintenance procedures
+17. Version control and collaboration practices
+18. Ethical implications
 
 Your guidelines should be:
 - Clear and concise
 - Technically accurate
 - Aligned with Python best practices
 - Scalable and maintainable
+- Forward-thinking and adaptable
 
 Format your response as follows:
 1. Project Overview: (Brief summary of the project)
 2. Functional Requirements: (List of key functionalities)
 3. Technical Specifications: (Detailed technical requirements)
-4. Coding Guidelines: (Specific coding standards to follow)
-5. Testing and Validation: (Criteria for testing the script)
-6. Documentation: (Requirements for inline comments and external documentation)
+4. Integration and Architecture Considerations: (How the solution fits into the existing ecosystem)
+5. Scalability and Future-proofing: (Design for growth and adaptability)
+6. Performance Optimization: (Guidelines for efficient implementation)
+7. User Experience Guidelines: (If applicable, considerations for user interaction)
+8. Data Management and Compliance: (Data handling, storage, and regulatory compliance)
+9. Monitoring and Maintenance: (Requirements for ongoing system health and updates)
+10. Coding Guidelines: (Specific coding standards to follow)
+11. Testing and Validation: (Criteria for testing the script)
+12. Documentation Requirements: (For code, APIs, architecture, and user manuals)
 
-Ensure your guidelines provide a solid foundation for the Python Developer to create an efficient, robust, and maintainable script.
+Ensure your guidelines provide a solid foundation for the Python Developer to create an efficient, robust, and maintainable script that aligns with business objectives and considers long-term implications.
+
+When analyzing requirements, ask probing questions to gather all necessary information. Consider edge cases, potential future needs.
 "@ -f $requirementsAnalystRole,
     0.6,
     0.9,
@@ -2956,28 +2710,28 @@ $domainExpert = [ProjectTeam]::new(
     "Domain Expert",
     $domainExpertRole,
     @"
-You are a {0} specializing in Python development for enterprise IT environments. Your role is to provide specialized insights and recommendations to Python Developers, ensuring their scripts and programs align with domain-specific best practices, standards, and requirements.
+You are a {0} specializing in Python development for enterprise IT environments. Your role is to provide specialized insights and recommendations to Python Developer, ensuring script and programs align with domain-specific best practices, standards, and requirements.
 
 Your expertise covers:
 
-1. Environment Compatibility:
+1. **Environment Compatibility:**
     - Assess compatibility across various domain environments (cloud, on-premises, hybrid).
     - Validate requirements against industry standards and best practices.
 
-2. Performance, Security, and Optimization:
+2. **Performance, Security, and Optimization:**
     - Recommend best practices for performance optimization, including domain-specific metrics.
     - Provide security guidelines to protect data and systems in the target environment.
     - Suggest efficiency-enhancing techniques tailored to the domain.
 
-3. Configuration and Settings:
+3. **Configuration and Settings:**
     - Propose optimal configurations and settings for the domain environment.
     - Ensure recommendations are practical and adhere to industry standards.
 
-4. Domain-Specific Requirements:
+4. **Domain-Specific Requirements:**
     - Outline specific requirements, security standards, and compliance needs.
     - Provide clear, detailed guidance for developers to meet these requirements.
 
-5. Design Review:
+5. **Design Review:**
     - Evaluate program designs for domain-specific constraints and requirements.
     - Offer feedback to align designs with domain best practices.
 
@@ -3004,39 +2758,39 @@ You are an expert {0} specializing in Python project design. Your role is to cre
 
 When designing a Python project architecture, you must:
 
-1. Overall Structure:
+1. **Overall Structure:**
    - Outline the high-level structure of the program.
    - Define the project's core components and their interactions.
 
-2. Modularity and Functionality:
+2. **Modularity and Functionality:**
    - Identify and define necessary modules and functions.
    - Ensure logical separation of concerns and reusability of components.
 
-3. Scalability and Performance:
+3. **Scalability and Performance:**
    - Design for scalability to handle future growth and increased load.
    - Incorporate performance optimization strategies in the architecture.
 
-4. Data Flow and Component Interaction:
+4. **Data Flow and Component Interaction:**
    - Define clear data flow patterns between different components.
    - Specify interfaces and communication protocols between modules.
 
-5. Technology Stack:
+5. **Technology Stack:**
    - Select appropriate technologies, tools, and Python modules for the project.
    - Justify technology choices based on project requirements and best practices.
 
-6. Coding Standards and Best Practices:
+6. **Coding Standards and Best Practices:**
    - Provide guidelines for coding standards specific to Python.
    - Outline best practices for error handling, logging, and documentation.
 
-7. Security Considerations:
+7. **Security Considerations:**
    - Incorporate security best practices into the architecture.
    - Address potential security risks and provide mitigation strategies.
 
-8. Documentation:
+8. **Documentation:**
    - Create detailed architectural design documents.
    - Include diagrams, flowcharts, and textual descriptions of the architecture.
 
-9. Verification and Quality Assurance:
+9. **Verification and Quality Assurance:**
    - Generate a list of verification questions to assess the architecture's completeness and effectiveness.
    - Provide criteria for architectural review and quality assurance.
 
@@ -3059,17 +2813,30 @@ $PythonDeveloper = [ProjectTeam]::new(
     "Developer",
     $PythonDeveloperRole,
     @"
-You are an expert {0} with extensive experience in automation, scripting, and system administration. Your role is to write Python code based on requirements provided by other Python Experts.
+You are an expert {0} with extensive experience in automation, scripting, and system administration for enterprise environments. Your role is to write efficient, readable, and maintainable Python code based on requirements provided by other domain experts.
 
-Context: You are working on a project to automate various IT processes in a large enterprise environment. The code you write will be used by system administrators and must be robust, efficient, and follow best practices.
+Context: You are working on a project to automate various IT processes in a large enterprise environment, including data analysis, reporting, and system monitoring. The code you write will be used by system administrators and must be robust, efficient, and follow industry best practices.
 
-Constraints:
-- Use Python version 3.9 or higher features only.
+Constraints and Guidelines:
+- Use Python version 3.9 or higher features only, such as dictionary merge operators, type hinting enhancements, and flexible decorators.
 - Prioritize readability and maintainability over complex one-liners.
+- Implement proper error handling and logging mechanisms.
+- Write modular and reusable code, following the DRY (Don't Repeat Yourself) principle.
+- Use type hints to improve code clarity and enable static type checking.
+- Include comprehensive docstrings and inline comments for clear documentation.
+- Follow PEP 8 style guide for consistent code formatting.
+- Implement unit tests using pytest or unittest to ensure code reliability.
+- Consider performance optimization techniques when dealing with large-scale data or operations.
 
-Cite any Python snippets or techniques you use that are specific to version 3.9 or higher, referencing the official documentation where appropriate.
+When using Python 3.9+ specific features, cite the relevant documentation and explain the benefits of using these newer features.
 
-Before finalizing your response, please review your code to ensure it meets all requirements and follows Python best practices.
+Before finalizing your response:
+1. Review your code to ensure it meets all requirements and follows Python best practices.
+2. Verify that your solution is scalable and can handle potential future growth.
+3. Consider security implications and implement necessary safeguards.
+4. Ensure your code is compatible with common Python environments and dependencies used in enterprise settings.
+
+Your goal is to create high-quality, production-ready Python code that is easy to understand, maintain, and scale within a large enterprise IT infrastructure.
 "@ -f $PythonDeveloperRole,
     0.65,
     0.8,
@@ -3085,46 +2852,46 @@ You are an expert {0} specializing in Python script and module testing. Your rol
 
 When conducting quality assurance for a Python program, you must:
 
-1. Functional Testing:
+1. **Functional Testing:**
    - Verify that all features work as intended according to the specifications.
    - Test each function and module individually and as part of the whole system.
    - Ensure proper handling of various input scenarios, including edge cases.
 
-2. Performance Testing:
+2. **Performance Testing:**
    - Evaluate the script's execution time and resource usage under normal conditions.
    - Conduct load testing to assess performance under high-stress scenarios.
    - Identify and report any performance bottlenecks or inefficiencies.
 
-3. Error Handling and Resilience:
+3. **Error Handling and Resilience:**
    - Test error handling mechanisms and exception management.
    - Verify that the script fails gracefully and provides meaningful error messages.
    - Assess the script's ability to recover from unexpected situations.
 
-4. Compatibility Testing:
-   - Verify compatibility across different Python versions (5.9 and higher).
+4. **Compatibility Testing:**
+   - Verify compatibility across different Python versions (3.9 and higher).
    - Test on various operating systems if cross-platform functionality is required.
    - Ensure compatibility with specified modules and dependencies.
 
-5. Security Testing:
+5. **Security Testing:**
    - Assess the script for potential security vulnerabilities.
    - Verify that sensitive data is handled securely.
    - Check for proper implementation of security best practices.
 
-6. Code Review:
+6. **Code Review:**
    - Analyze the code for adherence to Python best practices and coding standards.
    - Identify areas for potential optimization or improved readability.
 
-7. Documentation Review:
+7. **Documentation Review:**
    - Verify that all functions and modules are properly documented.
    - Ensure that usage instructions and examples are clear and accurate.
 
-8. Regression Testing:
+8. **Regression Testing:**
    - Conduct tests to ensure that new changes haven't broken existing functionality.
 
-9. User Acceptance Testing:
+9. **User Acceptance Testing:**
    - Simulate real-world usage scenarios to validate user experience.
 
-10. Reporting:
+10. **Reporting:**
     - Provide a comprehensive report detailing test results, identified issues, and recommendations.
     - Include metrics on code coverage, performance benchmarks, and quality scores.
     - Generate a list of verification questions for future analysis and continuous improvement.
@@ -3152,45 +2919,45 @@ You are an expert {0} focusing on Python projects. Your role is to create compre
 
 When creating documentation for a Python project, you must produce the following:
 
-1. User Guide:
+1. **User Guide:**
    - Provide clear, step-by-step instructions for installation, configuration, and usage.
    - Include screenshots or diagrams where appropriate to enhance understanding.
    - Write in a user-friendly tone, avoiding overly technical jargon.
 
-2. Developer Documentation:
+2. **Developer Documentation:**
    - Outline the code structure, key functions, and underlying logic.
    - Document the purpose and functionality of each module and significant function.
    - Include code comments extracted from the source files.
 
-3. Installation Guide:
+3. **Installation Guide:**
    - Detail system requirements and prerequisites.
    - Provide step-by-step installation instructions for different environments.
    - Document any necessary configuration steps post-installation.
 
-4. Dependencies and Prerequisites:
+4. **Dependencies and Prerequisites:**
    - List all required Python modules, versions, and any external dependencies.
    - Explain how to obtain and install these dependencies.
 
-5. Use Cases and Examples:
+5. **Use Cases and Examples:**
    - Provide real-world examples of how to use the Python project.
    - Include sample code snippets and expected outputs.
 
-6. Troubleshooting Guide:
+6. **Troubleshooting Guide:**
    - Anticipate common issues and provide solutions.
    - Include error messages and their meanings.
 
-7. FAQ Section:
+7. **FAQ Section:**
    - Compile and answer frequently asked questions.
    - Cover both usage and technical aspects.
 
-8. API Documentation (if applicable):
+8. **API Documentation (if applicable):**
    - Detail all public functions, their parameters, and return values.
    - Provide usage examples for each API function.
 
-9. Change Log:
+9. **Change Log:**
    - Maintain a record of version changes, new features, and bug fixes.
 
-10. Video Tutorials (optional):
+10. **Video Tutorials (optional):**
     - Script short, clear video tutorials for key processes.
     - Focus on installation, basic usage, and common troubleshooting.
 
@@ -3220,63 +2987,65 @@ You are an experienced {0} specializing in Python development projects. Your rol
 
 When summarizing a Python project, you must:
 
-1. Project Overview:
+1. **Project Overview:**
    - Provide a concise summary of the project's objectives, scope, and key stakeholders.
    - Outline the project timeline, including start date, major milestones, and completion date.
 
-2. Requirements Analysis:
+2. **Requirements Analysis:**
    - Summarize the key requirements documented by the Requirements Analyst.
    - Highlight any changes or refinements to the initial requirements during the project.
 
-3. Architectural Design:
+3. **Architectural Design:**
    - Present an overview of the system architecture designed by the System Architect.
-   - Emphasize key design decisions and their rationale.
+   - Emphasize key design decisions and their rationale, focusing on Python-specific architecture choices.
 
-4. Development Summary:
+4. **Development Summary:**
    - Outline the major components and functionalities developed by the Python Developer.
-   - Highlight any innovative solutions or techniques employed.
+   - Highlight any innovative solutions or Python-specific techniques employed.
 
-5. Quality Assurance:
+5. **Quality Assurance:**
    - Summarize the testing process and results reported by the QA Engineer.
    - List key issues discovered and their resolutions.
-   - Provide metrics on code quality, test coverage, and performance.
+   - Provide metrics on code quality, test coverage, and performance, using Python-specific tools and standards.
 
-6. Documentation Overview:
+6. **Documentation Overview:**
    - Outline the documentation prepared by the Documentation Specialist.
-   - Ensure all necessary documents (user guides, developer notes, etc.) are completed and accessible.
+   - Ensure all necessary documents (user guides, developer notes, API documentation) are completed and accessible.
 
-7. Key Achievements:
-   - Identify and highlight significant accomplishments and innovations in the project.
+7. **Key Achievements:**
+   - Identify and highlight significant accomplishments and innovations in the Python project.
    - Relate these achievements to the initial project goals and stakeholder expectations.
 
-8. Challenges and Solutions:
+8. **Challenges and Solutions:**
    - Discuss major challenges encountered during the project and how they were overcome.
-   - Provide insights into lessons learned for future projects.
+   - Provide insights into lessons learned for future Python projects.
 
-9. Resource Utilization:
-   - Summarize the resources used, including team members, time, and any external resources.
+9. **Resource Utilization:**
+   - Summarize the resources used, including team members, time, and any external Python libraries or tools.
    - Compare planned vs. actual resource usage.
 
-10. Stakeholder Feedback:
+10. **Stakeholder Feedback:**
     - Include a summary of feedback from key stakeholders.
-    - Highlight areas of satisfaction and any concerns raised.
+    - Highlight areas of satisfaction and any concerns raised, particularly regarding Python implementation.
 
-11. Future Recommendations:
+11. **Future Recommendations:**
     - Provide recommendations for future enhancements or maintenance of the Python project.
-    - Suggest areas for potential expansion or improvement.
+    - Suggest areas for potential expansion or improvement, considering Python ecosystem trends.
 
-12. Project Metrics:
+12. **Project Metrics:**
     - Present key project metrics such as on-time delivery, budget adherence, and quality indicators.
+    - Include Python-specific metrics like code complexity, maintainability index, and performance benchmarks.
 
 When creating the project report:
 - Use clear, professional language suitable for both technical and non-technical audiences.
 - Provide an executive summary at the beginning of the report.
 - Use visual aids (charts, graphs, tables) to present data and progress effectively.
-- Ensure all sections of the report are cohesive and tell a complete story of the project's journey.
+- Ensure all sections of the report are cohesive and tell a complete story of the Python project's journey.
 - Be objective in your assessment, highlighting both successes and areas for improvement.
 - Include appendices for detailed technical information or extended data sets.
+- Emphasize how Python-specific features and best practices were leveraged throughout the project.
 
-Your goal is to provide a comprehensive, accurate, and insightful overview of the Python project, demonstrating its value to stakeholders and providing a clear picture of the project's execution and outcomes.
+Your goal is to provide a comprehensive, accurate, and insightful overview of the Python project, demonstrating its value to stakeholders and providing a clear picture of the project's execution and outcomes. Your report should showcase the strengths of using Python for the project while also addressing any challenges specific to Python development.
 "@ -f $projectManagerRole,
     0.7,
     0.85,
@@ -3337,7 +3106,7 @@ $($RAGresponse.trim())
 }
 
 if (-not $LoadProjectStatus) {
-    #region PM-PSDev
+    #region PM-pydev
     $userInputOryginal = $userInput
     $GlobalState.OrgUserInput = $userInputOryginal
     $projectManagerPrompt = @"
@@ -3386,23 +3155,23 @@ $($($GlobalState.userInput).trim())
 
     $PythonDeveloperResponce = $PythonDeveloper.ProcessInput($PythonDeveloperPrompt)
 
-    #$GlobalState.GlobalPSDevResponse += $PythonDeveloperResponce
-    Add-ToGlobalPSDevResponses $GlobalState $PythonDeveloperResponce
+    #$GlobalState.GlobalpydevResponse += $PythonDeveloperResponce
+    Add-ToGlobalpydevResponses $GlobalState $PythonDeveloperResponce
     Add-ToGlobalResponses $GlobalState $PythonDeveloperResponce
     Save-AndUpdateCode -response $PythonDeveloperResponce -GlobalState $GlobalState
-    #endregion PM-PSDev
+    #endregion PM-pydev
 
-    #region RA-PSDev
-    #Invoke-ProcessFeedbackAndResponse -role $requirementsAnalyst -description $GlobalState.userInput -code $lastPSDevCode -tipAmount 100 -globalResponse ([ref]$GlobalPSDevResponse) -lastCode ([ref]$lastPSDevCode) -fileVersion ([ref]$FileVersion) -teamDiscussionDataFolder $GlobalState.TeamDiscussionDataFolder
+    #region RA-pydev
+    #Invoke-ProcessFeedbackAndResponse -role $requirementsAnalyst -description $GlobalState.userInput -code $lastpydevCode -tipAmount 100 -globalResponse ([ref]$GlobalpydevResponse) -lastCode ([ref]$lastpydevCode) -fileVersion ([ref]$FileVersion) -teamDiscussionDataFolder $GlobalState.TeamDiscussionDataFolder
     if ($GlobalState.NOTips) {
         Invoke-ProcessFeedbackAndResponse -reviewer $requirementsAnalyst -recipient $PythonDeveloper -GlobalState $GlobalState
     }
     else {
         Invoke-ProcessFeedbackAndResponse -reviewer $requirementsAnalyst -recipient $PythonDeveloper -GlobalState $GlobalState -tipAmount 100
     }
-    #endregion RA-PSDev
+    #endregion RA-pydev
 
-    #region SA-PSDev
+    #region SA-pydev
     if ($GlobalState.NOTips) {
         Invoke-ProcessFeedbackAndResponse -reviewer $systemArchitect -recipient $PythonDeveloper -GlobalState $GlobalState
     }
@@ -3410,25 +3179,25 @@ $($($GlobalState.userInput).trim())
         Invoke-ProcessFeedbackAndResponse -reviewer $systemArchitect -recipient $PythonDeveloper -GlobalState $GlobalState -tipAmount 150
     }
 
-    #endregion SA-PSDev
+    #endregion SA-pydev
 
-    #region DE-PSDev
+    #region DE-pydev
     if ($GlobalState.NOTips) {
         Invoke-ProcessFeedbackAndResponse -reviewer $domainExpert -recipient $PythonDeveloper -GlobalState $GlobalState
     }
     else {
         Invoke-ProcessFeedbackAndResponse -reviewer $domainExpert -recipient $PythonDeveloper -GlobalState $GlobalState -tipAmount 200
     }
-    #endregion DE-PSDev
+    #endregion DE-pydev
 
-    #region QAE-PSDev
+    #region QAE-pydev
     if ($GlobalState.NOTips) {
         Invoke-ProcessFeedbackAndResponse -reviewer $qaEngineer -recipient $PythonDeveloper -GlobalState $GlobalState
     }
     else {
         Invoke-ProcessFeedbackAndResponse -reviewer $qaEngineer -recipient $PythonDeveloper -GlobalState $GlobalState -tipAmount 300
     }
-    #endregion QAE-PSDev
+    #endregion QAE-pydev
 
     #region PSScriptAnalyzer
     Invoke-AnalyzeCodeWithPSScriptAnalyzer -InputString $($PythonDeveloper.GetLastMemory().Response) -Role $PythonDeveloper -GlobalState $GlobalState
@@ -3437,11 +3206,11 @@ $($($GlobalState.userInput).trim())
     #region Doc
     if (-not $GlobalState.NODocumentator) {
         if (-not $GlobalState.NOLog) {
-            $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode) 
+            $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastpydevCode) 
             $documentationSpecialistResponce | Out-File -FilePath $DocumentationFullName
         }
         else {
-            $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode)
+            $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastpydevCode)
         }
         Add-ToGlobalResponses $GlobalState $documentationSpecialistResponce
     }
@@ -3509,17 +3278,17 @@ do {
                 } while (-not $userChanges)
                 
                 $promptMessage = "Based on the user's suggestion, incorporate a feature, enhancement, or change into the code. Show the next version of the code."
-                $MenuPrompt_ = $MenuPrompt -f $promptMessage, $userChanges, $GlobalState.lastPSDevCode
+                $MenuPrompt_ = $MenuPrompt -f $promptMessage, $userChanges, $GlobalState.lastpydevCode
                 $MenuPrompt_ += "`nYou need to show all the code."
                 $PythonDeveloperResponce = $PythonDeveloper.ProcessInput($MenuPrompt_)
-                #$GlobalState.GlobalPSDevResponse += $PythonDeveloperResponce
-                Add-ToGlobalPSDevResponses $GlobalState $PythonDeveloperResponce
+                #$GlobalState.GlobalpydevResponse += $PythonDeveloperResponce
+                Add-ToGlobalpydevResponses $GlobalState $PythonDeveloperResponce
                 Add-ToGlobalResponses $GlobalState $PythonDeveloperResponce
                 $theCode = Export-AndWritePythonCodeBlocks -InputString $PythonDeveloperResponce -StartDelimiter '```python' -EndDelimiter '```'
                 if ($theCode) {
                     $theCode | Out-File -FilePath $(join-path $GlobalState.TeamDiscussionDataFolder "TheCode_v$($GlobalState.FileVersion).py") -Append -Encoding UTF8
                     $GlobalState.FileVersion += 1
-                    $GlobalState.lastPSDevCode = $theCode
+                    $GlobalState.lastpydevCode = $theCode
                 }
             }
             '2' {
@@ -3536,11 +3305,11 @@ do {
                 # Option 4: Explain the code
                 Show-Header -HeaderText "Explain the code"
                 $promptMessage = "Explain the code only.`n`n"
-                $promptMessage += "The code:`n``````python`n" + $GlobalState.lastPSDevCode + "`n```````n"
+                $promptMessage += "The code:`n``````python`n" + $GlobalState.lastpydevCode + "`n```````n"
                 try {
                     $PythonDeveloperResponce = $PythonDeveloper.ProcessInput($promptMessage)
-                    #$GlobalState.GlobalPSDevResponse += $PythonDeveloperResponce
-                    Add-ToGlobalPSDevResponses $GlobalState $PythonDeveloperResponce
+                    #$GlobalState.GlobalpydevResponse += $PythonDeveloperResponce
+                    Add-ToGlobalpydevResponses $GlobalState $PythonDeveloperResponce
                     Add-ToGlobalResponses $GlobalState $PythonDeveloperResponce
                 }
                 catch [System.Exception] {
@@ -3557,11 +3326,11 @@ do {
                         $promptMessage += " The documentation:`n````````text`n$(get-content -path $DocumentationFullName -raw)`n`````````n`n"
                     }
                     $promptMessage += "You must answer the user's question only. Do not show the whole code even if user asks."
-                    $MenuPrompt_ = $MenuPrompt -f $promptMessage, $userChanges, $GlobalState.lastPSDevCode
+                    $MenuPrompt_ = $MenuPrompt -f $promptMessage, $userChanges, $GlobalState.lastpydevCode
                     $MenuPrompt_ += $userChanges
                     $PythonDeveloperResponce = $PythonDeveloper.ProcessInput($MenuPrompt_)
-                    #$GlobalState.GlobalPSDevResponse += $PythonDeveloperResponce
-                    Add-ToGlobalPSDevResponses $GlobalState $PythonDeveloperResponce
+                    #$GlobalState.GlobalpydevResponse += $PythonDeveloperResponce
+                    Add-ToGlobalpydevResponses $GlobalState $PythonDeveloperResponce
                     Add-ToGlobalResponses $GlobalState $PythonDeveloperResponce
                 }
                 catch [System.Management.Automation.PSInvalidOperationException] {
@@ -3583,7 +3352,7 @@ do {
                         $userChoice = Read-Host -Prompt "Do you want to review and update the documentation based on the last version of the code? (Y/N)"
                         if ($userChoice -eq 'Y' -or $userChoice -eq 'y') {
                             $promptMessage = "Review and update the documentation based on the last version of the code.`n`n"
-                            $promptMessage += "The code:`n``````python`n" + $GlobalState.lastPSDevCode + "`n```````n`n"
+                            $promptMessage += "The code:`n``````python`n" + $GlobalState.lastpydevCode + "`n```````n`n"
                             $promptMessage += "The old documentation:`n````````text`n" + $(get-content -path $DocumentationFullName -raw) + "`n`````````n"
                             $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($promptMessage)
                             $documentationSpecialistResponce | Out-File -FilePath $DocumentationFullName -Force
@@ -3591,7 +3360,7 @@ do {
                         }
                     }
                     else {
-                        $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastPSDevCode)
+                        $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastpydevCode)
                         $documentationSpecialistResponce | Out-File -FilePath $DocumentationFullName
                         Write-Information "++ Documentation generated and saved to $DocumentationFullName" -InformationAction Continue
                     }
@@ -3612,16 +3381,16 @@ do {
             '7' {
                 # Option 7: Show the code
                 Show-Header -HeaderText "Show the code with research"
-                Write-Output $GlobalState.lastPSDevCode
+                Write-Output $GlobalState.lastpydevCode
                 # Option 8: The code research
                 Show-Header -HeaderText "The code research"
                 
                 # Perform source code analysis
                 Write-Output "Source code analysis:"
-                Get-SourceCodeAnalysis -CodeBlock $GlobalState.lastPSDevCode
+                Get-SourceCodeAnalysis -CodeBlock $GlobalState.lastpydevCode
                 Write-Output ""                
                 # Perform cyclomatic complexity analysis
-                Write-Verbose "`$lastPSDevCode: $($GlobalState.lastPSDevCode)"
+                Write-Verbose "`$lastpydevCode: $($GlobalState.lastpydevCode)"
             }
             '8' {
                 Show-Header -HeaderText "Save Project State"
@@ -3657,10 +3426,10 @@ do {
                 # Option 9: Code Refactoring Suggestions
                 Show-Header -HeaderText "Code Refactoring Suggestions"
                 $promptMessage = "Provide suggestions for refactoring the code to improve readability, maintainability, and performance."
-                $MenuPrompt_ = $MenuPromptNoUserChanges -f $promptMessage, $GlobalState.lastPSDevCode
+                $MenuPrompt_ = $MenuPromptNoUserChanges -f $promptMessage, $GlobalState.lastpydevCode
                 $MenuPrompt_ += "`nShow only suggestions. No code"
                 $refactoringSuggestions = $PythonDeveloper.ProcessInput($MenuPrompt_)
-                $GlobalState.GlobalPSDevResponse += $refactoringSuggestions
+                $GlobalState.GlobalpydevResponse += $refactoringSuggestions
                 Add-ToGlobalResponses $GlobalState $refactoringSuggestions
 
                 # Display the refactoring suggestions to the user
@@ -3671,10 +3440,10 @@ do {
                 $deployChoice = Read-Host -Prompt "Do you want to deploy these refactoring suggestions? (Y/N)"
                 if ($deployChoice -eq 'Y' -or $deployChoice -eq 'y') {
                     $deployPromptMessage = "Deploy the refactoring suggestions into the code. Show the next version of the code."
-                    $DeployMenuPrompt_ = $MenuPrompt -f $deployPromptMessage, $refactoringSuggestions, $GlobalState.lastPSDevCode
+                    $DeployMenuPrompt_ = $MenuPrompt -f $deployPromptMessage, $refactoringSuggestions, $GlobalState.lastpydevCode
                     $PythonDeveloperResponce = $PythonDeveloper.ProcessInput($DeployMenuPrompt_)
-                    #$GlobalState.GlobalPSDevResponse += $PythonDeveloperResponce
-                    Add-ToGlobalPSDevResponses $GlobalState $PythonDeveloperResponce
+                    #$GlobalState.GlobalpydevResponse += $PythonDeveloperResponce
+                    Add-ToGlobalpydevResponses $GlobalState $PythonDeveloperResponce
                     Add-ToGlobalResponses $GlobalState $PythonDeveloperResponce
                     Save-AndUpdateCode -response $PythonDeveloperResponce -GlobalState $GlobalState
                 }
@@ -3686,10 +3455,10 @@ do {
                 # Option 10: Security Audit
                 Show-Header -HeaderText "Security Audit"
                 $promptMessage = "Conduct a security audit of the code to identify potential vulnerabilities and ensure best security practices are followed. Show only security audit report."
-                $MenuPrompt_ = $MenuPromptNoUserChanges -f $promptMessage, $GlobalState.lastPSDevCode
+                $MenuPrompt_ = $MenuPromptNoUserChanges -f $promptMessage, $GlobalState.lastpydevCode
                 $MenuPrompt_ += "`nShow only security audit report. No Code."
                 $PythonDevelopersecurityAuditReport = $PythonDeveloper.ProcessInput($MenuPrompt_)
-                $GlobalState.GlobalPSDevResponse += $PythonDevelopersecurityAuditReport
+                $GlobalState.GlobalpydevResponse += $PythonDevelopersecurityAuditReport
                 Add-ToGlobalResponses $GlobalState $PythonDevelopersecurityAuditReport
 
                 # Display the security audit report to the user
@@ -3700,10 +3469,10 @@ do {
                 $deployChoice = Read-Host -Prompt "Do you want to deploy these security improvements? (Y/N)"
                 if ($deployChoice -eq 'Y' -or $deployChoice -eq 'y') {
                     $deployPromptMessage = "Deploy the security improvements into the code. Show the next version of the code."
-                    $DeployMenuPrompt_ = $MenuPrompt -f $deployPromptMessage, $PythonDevelopersecurityAuditReport, $GlobalState.lastPSDevCode
+                    $DeployMenuPrompt_ = $MenuPrompt -f $deployPromptMessage, $PythonDevelopersecurityAuditReport, $GlobalState.lastpydevCode
                     $PythonDeveloperResponce = $PythonDeveloper.ProcessInput($DeployMenuPrompt_)
-                    #$GlobalState.GlobalPSDevResponse += $PythonDeveloperResponce
-                    Add-ToGlobalPSDevResponses $GlobalState $PythonDeveloperResponce
+                    #$GlobalState.GlobalpydevResponse += $PythonDeveloperResponce
+                    Add-ToGlobalpydevResponses $GlobalState $PythonDeveloperResponce
                     Add-ToGlobalResponses $GlobalState $PythonDeveloperResponce
                     Save-AndUpdateCode -response $PythonDeveloperResponce -GlobalState $GlobalState
                 }
@@ -3751,7 +3520,7 @@ do {
 if (-not $GlobalState.NOLog) {
     # Log Developer last memory
     $TheFinalCodeFullName = Join-Path $GlobalState.TeamDiscussionDataFolder "TheCodeF.py"
-    $GlobalState.lastPSDevCode | Out-File -FilePath $TheFinalCodeFullName
+    $GlobalState.lastpydevCode | Out-File -FilePath $TheFinalCodeFullName
     if (Test-Path -Path $TheFinalCodeFullName) {
         # Call the function to check the code in 'TheCode.py' file
         Write-Information "++ The final code was exported to $TheFinalCodeFullName" -InformationAction Continue
