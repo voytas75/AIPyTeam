@@ -810,58 +810,6 @@ function Export-AndWritePythonCodeBlocks {
     return $false
 }
 
-
-function Invoke-CodeWithPSScriptAnalyzer {
-    param(
-        [Parameter(Mandatory = $false)]
-        [string]$FilePath,
-        [Parameter(Mandatory = $false)]
-        [string]$ScriptBlock
-    )
-
-    try {
-        # Check if PSScriptAnalyzer module is installed
-        if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
-            throw "PSScriptAnalyzer module is not installed. Install it using: 'Install-Module -Name PSScriptAnalyzer'"
-        }
-
-        # Import PSScriptAnalyzer module
-        Import-Module -Name PSScriptAnalyzer -ErrorAction Stop
-
-        # Check if file exists
-        if ($FilePath -and -not (Test-Path -Path $FilePath)) {
-            throw "File '$FilePath' does not exist."
-        }
-
-        # Run PSScriptAnalyzer on the file or script block
-        if ($FilePath) {
-            $analysisResults = Invoke-ScriptAnalyzer -Path $FilePath -Severity Warning, Error
-        }
-        elseif ($ScriptBlock) {
-            $analysisResults = Invoke-ScriptAnalyzer -ScriptDefinition $ScriptBlock -Severity Warning, Error
-        }
-        else {
-            throw "No FilePath or ScriptBlock provided for analysis."
-        }
-
-        # Display the analysis results
-        if ($analysisResults.Count -eq 0) {
-            Write-Information "++ No Warning, Error issues found by PSScriptAnalyzer." -InformationAction Continue
-            return $false
-        }
-        else {
-            Write-Information "++ PSScriptAnalyzer found the following Warning, Error issues:" -InformationAction Continue
-            return $analysisResults
-        }
-        return $false
-    }
-    catch [System.Exception] {
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
-    }
-    return $false
-}
-
 function Show-Header {
     param(
         [Parameter(Mandatory = $true)]
@@ -1079,7 +1027,7 @@ function Update-GlobalStateWithResponse {
         Add-ToGlobalResponses -GlobalState $GlobalState -response $response
 
         # Save the new version of the code to a file
-        $_savedFile = Export-AndWritePythonCodeBlocks -InputString $response -OutputFilePath $(join-path $GlobalState.teamDiscussionDataFolder "TheCode_v$($GlobalState.fileVersion).ps1") -StartDelimiter '```python' -EndDelimiter '```'
+        $_savedFile = Export-AndWritePythonCodeBlocks -InputString $response -OutputFilePath $(join-path $GlobalState.teamDiscussionDataFolder "TheCode_v$($GlobalState.fileVersion).py") -StartDelimiter '```python' -EndDelimiter '```'
 
         if ((Test-Path -Path $_savedFile) -and $_savedFile) {
             # Update the last code and file version
@@ -1180,7 +1128,7 @@ function Save-AndUpdateCode2 {
     )
     try {
         # Save the response to a versioned file
-        $_savedFile = Export-AndWritePythonCodeBlocks -InputString $response -OutputFilePath $(join-path $GlobalState.teamDiscussionDataFolder "TheCode_v$($GlobalState.fileVersion).ps1") -StartDelimiter '```python' -EndDelimiter '```'
+        $_savedFile = Export-AndWritePythonCodeBlocks -InputString $response -OutputFilePath $(join-path $GlobalState.teamDiscussionDataFolder "TheCode_v$($GlobalState.fileVersion).py") -StartDelimiter '```python' -EndDelimiter '```'
     
         if (Test-Path -Path $_savedFile) {
             # Update the last code content with the saved file content
@@ -1199,112 +1147,6 @@ function Save-AndUpdateCode2 {
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
     }
 
-}
-
-function Invoke-AnalyzeCodeWithPSScriptAnalyzer {
-    <#
-    .SYNOPSIS
-    Analyzes Python code using PSScriptAnalyzer and processes the results.
-
-    .DESCRIPTION
-    This function takes an input string containing Python code, analyzes it using PSScriptAnalyzer, and processes any issues found. 
-    It updates the last version of the code and the global response with the analysis results.
-
-    .PARAMETER InputString
-    The Python code to be analyzed.
-
-    .PARAMETER TeamDiscussionDataFolder
-    The folder where team discussion data and code versions are stored.
-
-    .PARAMETER FileVersion
-    A reference to the variable holding the current file version number.
-
-    .PARAMETER lastPSDevCode
-    A reference to the variable holding the last version of the Python code.
-
-    .PARAMETER GlobalPSDevResponse
-    A reference to the variable holding the global response from the Python Developer.
-
-    .EXAMPLE
-    Invoke-AnalyzeCodeWithPSScriptAnalyzer -InputString $code -TeamDiscussionDataFolder "C:\TeamData" -FileVersion ([ref]$fileVersion) -lastPSDevCode ([ref]$lastPSDevCode) -GlobalPSDevResponse ([ref]$globalResponse)
-    #>
-
-    param (
-        [string] $InputString, # The Python code to be analyzed
-        [object] $role,
-        [PSCustomObject] $GlobalState
-    )
-
-    # Display header for code analysis
-    Show-Header -HeaderText "Code analysis by PSScriptAnalyzer"
-    try {
-        # Log the last memory response from the Python Developer
-        Write-Verbose "getlastmemory PSDev: $InputString"
-        
-        # Export the Python code blocks from the input string
-        $_exportedCode = Export-AndWritePythonCodeBlocks -InputString $InputString -StartDelimiter '```python' -EndDelimiter '```'
-        
-        # Update the last Python Developer code with the exported code when not false
-        if ($null -ne $_exportedCode -and $_exportedCode -ne $false) {
-            $GlobalState.lastPSDevCode = $_exportedCode
-            Write-Verbose "_exportCode, lastPSDevCode: $($GlobalState.lastPSDevCode)"
-        }
-        
-        # Analyze the code using PSScriptAnalyzer
-        $issues = Invoke-CodeWithPSScriptAnalyzer -ScriptBlock $GlobalState.lastPSDevCode
-        
-        # Output the issues found by PSScriptAnalyzer
-        if ($issues) {
-            Write-Output ($issues | Select-Object line, message | Format-Table -AutoSize -Wrap)
-        }
-    
-        # If issues were found, process them
-        if ($issues) {
-            foreach ($issue in $issues) {
-                $issueText += $issue.message + " (line: $($issue.Line); rule: $($issue.Rulename))`n"
-            }
-        
-            # Create a prompt message to address the issues found
-            $promptMessage = "You must address issues found in PSScriptAnalyzer report."
-            $promptMessage += "`n`nPSScriptAnalyzer report, issues:`n``````text`n$issueText`n```````n`n"
-            $promptMessage += "The code:`n``````python`n$($GlobalState.lastPSDevCode)`n```````n`nShow the new version of the code where issues are solved."
-        
-            # Reset issues and issueText variables
-            $issues = ""
-            $issueText = ""
-        
-            # Process the input with the Python Developer
-            $PythonDeveloperResponce = $role.ProcessInput($promptMessage)
-        
-            if ($PythonDeveloperResponce) {
-                # Update the global response with the new response
-                #$GlobalState.GlobalPSDevResponse += $PythonDeveloperResponce
-                Add-ToGlobalPSDevResponses $GlobalState $PythonDeveloperResponce
-                Add-ToGlobalResponses $GlobalState $PythonDeveloperResponce
-            
-                # Save the new version of the code to a file
-                $_savedFile = Export-AndWritePythonCodeBlocks -InputString $PythonDeveloperResponce -OutputFilePath $(Join-Path $GlobalState.TeamDiscussionDataFolder "TheCode_v$($GlobalState.FileVersion).ps1") -StartDelimiter '```python' -EndDelimiter '```'
-                Write-Verbose $_savedFile
-            
-                if ($null -ne $_savedFile -and $_savedFile -ne $false) {
-                    # Update the last code and file version
-                    $GlobalState.lastPSDevCode = Get-Content -Path $_savedFile -Raw 
-                    $GlobalState.FileVersion += 1
-                    Write-Verbose $GlobalState.lastPSDevCode
-                }
-                else {
-                    Write-Information "-- No valid file to update the last code and file version."
-                }
-            }
-        } 
-    
-        # Log the last Python Developer code
-        Write-Verbose $GlobalState.lastPSDevCode
-    }    
-    catch [System.Exception] {
-        $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
-    }
 }
 
 function Save-ProjectState {
@@ -3634,8 +3476,8 @@ do {
     Show-Header -HeaderText "MENU"
     Write-Host "Please select an option from the menu:"
     Write-Host "1. Suggest a new feature, enhancement, or change"
-    Write-Host "2. Analyze & modify with PSScriptAnalyzer"
-    Write-Host "3. Analyze PSScriptAnalyzer only"
+    Write-Host "2. Analyze & modify with ..."
+    Write-Host "3. Analyze ... only"
     Write-Host "4. Explain the code"
     Write-Host "5. Ask a specific question about the code"
     Write-Host "6. Generate documentation"
@@ -3675,58 +3517,19 @@ do {
                 Add-ToGlobalResponses $GlobalState $PythonDeveloperResponce
                 $theCode = Export-AndWritePythonCodeBlocks -InputString $PythonDeveloperResponce -StartDelimiter '```python' -EndDelimiter '```'
                 if ($theCode) {
-                    $theCode | Out-File -FilePath $(join-path $GlobalState.TeamDiscussionDataFolder "TheCode_v$($GlobalState.FileVersion).ps1") -Append -Encoding UTF8
+                    $theCode | Out-File -FilePath $(join-path $GlobalState.TeamDiscussionDataFolder "TheCode_v$($GlobalState.FileVersion).py") -Append -Encoding UTF8
                     $GlobalState.FileVersion += 1
                     $GlobalState.lastPSDevCode = $theCode
                 }
             }
             '2' {
                 # Option 2: Analyze & modify with PSScriptAnalyzer
-                Show-Header -HeaderText "Analyze & modify with PSScriptAnalyzer"
-                try {
-                    # Call the function to check the code in 'TheCode.ps1' file
-                    $issues = Invoke-CodeWithPSScriptAnalyzer -ScriptBlock $GlobalState.lastPSDevCode
-                    if ($issues) {
-                        write-output ($issues | Select-Object line, message | format-table -AutoSize -Wrap)
-                    }
-                }
-                catch {
-                    Write-Error "An error occurred while PSScriptAnalyzer: $_"
-                }
-                if ($issues) {
-                    foreach ($issue in $issues) {
-                        $issueText += $issue.message + " (line: $($issue.Line); rule: $($issue.Rulename))`n"
-                    }
-                    $promptMessage = "Your task is to address issues found in PSScriptAnalyzer report."
-                    $promptMessage += "`n`nPSScriptAnalyzer report, issues:`n``````text`n$issueText`n```````n`n"
-                    $promptMessage += "The code:`n``````python`n" + $GlobalState.lastPSDevCode + "`n```````n`nShow the new version of the Python code with solved issues."
-                    $issues = ""
-                    $issueText = ""
-                    $PythonDeveloperResponce = $PythonDeveloper.ProcessInput($promptMessage)
-                    $GlobalPSDevResponse += $PythonDeveloperResponce
-                    Add-ToGlobalResponses $GlobalState $PythonDeveloperResponce
-                    $theCode = Export-AndWritePythonCodeBlocks -InputString $($PythonDeveloper.GetLastMemory().Response) -StartDelimiter '```python' -EndDelimiter '```'
-                    if ($theCode) {
-                        $theCode | Out-File -FilePath $(join-path $GlobalState.TeamDiscussionDataFolder "TheCode_v$($GlobalState.FileVersion).ps1") -Append -Encoding UTF8
-                        $GlobalState.FileVersion += 1
-                        $GlobalState.lastPSDevCode = $theCode
-                    }
-                }
+                Show-Header -HeaderText "Analyze & modify with ...."
+
             }
             '3' {
                 # Option 3: Analyze PSScriptAnalyzer only
-                Show-Header -HeaderText "Analyze PSScriptAnalyzer only"
-                try {
-                    # Call the function to check the code in 'TheCode.ps1' file
-                    #$issues = Invoke-CodeWithPSScriptAnalyzer -ScriptBlock $(Export-AndWritePythonCodeBlocks -InputString $($PythonDeveloper.GetLastMemory().Response) -StartDelimiter '```python' -EndDelimiter '```')
-                    $issues = Invoke-CodeWithPSScriptAnalyzer -ScriptBlock $GlobalState.lastPSDevCode 
-                    if ($issues) {
-                        write-output ($issues | Select-Object line, message | format-table -AutoSize -Wrap)
-                    }
-                }
-                catch {
-                    Write-Error "!! An error occurred while PSScriptAnalyzer: $_"
-                }
+                Show-Header -HeaderText "Analyze ... only"
 
             }
             '4' {
@@ -3947,30 +3750,17 @@ do {
 #region Final code
 if (-not $GlobalState.NOLog) {
     # Log Developer last memory
-    $TheFinalCodeFullName = Join-Path $GlobalState.TeamDiscussionDataFolder "TheCodeF.PS1"
+    $TheFinalCodeFullName = Join-Path $GlobalState.TeamDiscussionDataFolder "TheCodeF.py"
     $GlobalState.lastPSDevCode | Out-File -FilePath $TheFinalCodeFullName
-    #Export-AndWritePythonCodeBlocks -InputString $(get-content $(join-path $GlobalState.TeamDiscussionDataFolder "TheCodeF.log") -raw) -OutputFilePath $(join-path $GlobalState.TeamDiscussionDataFolder "TheCode.ps1") -StartDelimiter '```python' -EndDelimiter '```'
     if (Test-Path -Path $TheFinalCodeFullName) {
-        # Call the function to check the code in 'TheCode.ps1' file
+        # Call the function to check the code in 'TheCode.py' file
         Write-Information "++ The final code was exported to $TheFinalCodeFullName" -InformationAction Continue
-        $issues = Invoke-CodeWithPSScriptAnalyzer -FilePath $TheFinalCodeFullName
-        if ($issues) {
-            write-output ($issues | Select-Object line, message | format-table -AutoSize -Wrap)
-        }
     }
     foreach ($TeamMember in $Team) {
         $TeamMember.DisplayInfo(0) | Out-File -FilePath $TeamMember.LogFilePath -Append
     }
     Write-Host "++ " -NoNewline
     Stop-Transcript
-}
-else {
-    #Export-AndWritePythonCodeBlocks -InputString $($PythonDeveloper.GetLastMemory().Response) -StartDelimiter '```python' -EndDelimiter '```' -OutputFilePath $(join-path ([System.Environment]::GetEnvironmentVariable("TEMP", "user")) "TheCodeF.ps1")
-    # Call the function to check the code in 'TheCode.ps1' file
-    $issues = Invoke-CodeWithPSScriptAnalyzer -ScriptBlock $GlobalState.lastPSDevCode
-    if ($issues) {
-        write-output ($issues | Select-Object line, message | format-table -AutoSize -Wrap)
-    }
 }
 #endregion Final code
 Save-ProjectState -FilePath $ProjectfilePath -GlobalState $GlobalState
