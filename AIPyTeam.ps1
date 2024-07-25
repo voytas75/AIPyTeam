@@ -4,7 +4,7 @@
 .AUTHOR voytas75
 .TAGS python,ai,psaoai,llm,project,team,gpt,ollama,azure,bing,RAG
 .PROJECTURI https://github.com/voytas75/AIPyTeam
-.ICONURI https://raw.githubusercontent.com/voytas75/AIPyTeam/master/images/AIPyTeam.png
+.ICONURI https://raw.githubusercontent.com/voytas75/AIPyTeam/master/images/aipyteam.png
 .EXTERNALMODULEDEPENDENCIES PSAOAI, PowerHTML
 .RELEASENOTES https://github.com/voytas75/AIPyTeam/blob/master/docs/ReleaseNotes.md
 #>
