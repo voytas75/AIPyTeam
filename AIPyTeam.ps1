@@ -1249,7 +1249,7 @@ function Invoke-LLMChatCompletion {
     }
 }
 
-function Invoke-AIPyTeamAzureOpenAIChatCompletion {
+function Invoke-AIPSTeamAzureOpenAIChatCompletion {
     param (
         [string]$SystemPrompt,
         [string]$UserPrompt,
@@ -1272,18 +1272,21 @@ function Invoke-AIPyTeamAzureOpenAIChatCompletion {
         Write-Verbose "LogFolder: $LogFolder"
         Write-Verbose "Deployment: $Deployment"
 
-        # Call Azure OpenAI API
-        Write-Host "++ AZURE OpenAI ($Deployment) is working..."
+        # Notify the start of the Azure OpenAI process
+        Write-Host "++ Initiating Azure OpenAI process for deployment: $Deployment..."
+        
         if ($Stream) {
-            Write-Host "++ Streaming" -ForegroundColor Blue
+            Write-Host "++ Streaming mode enabled." -ForegroundColor Blue
         }
 
         # Invoke the Azure OpenAI chat completion function
-        $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPyTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
+        $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
 
         if ($Stream) {
             Write-Host "++ Streaming completed." -ForegroundColor Blue
         }
+        
+        Write-Host "++ Azure OpenAI process initiated successfully for deployment: $Deployment."
 
         # Check if the response is null or empty
         if ([string]::IsNullOrEmpty($response)) {
@@ -1291,6 +1294,9 @@ function Invoke-AIPyTeamAzureOpenAIChatCompletion {
             Write-Error $errorMessage
             throw $errorMessage
         }
+
+        # Log the successful response
+        Write-Verbose "Azure OpenAI API response received successfully."
 
         return $response
     }
@@ -1304,7 +1310,7 @@ function Invoke-AIPyTeamAzureOpenAIChatCompletion {
     }
 }
 
-function Invoke-AIPyTeamOllamaCompletion {
+function Invoke-AIPSTeamOllamaCompletion {
     param (
         [string]$SystemPrompt,
         [string]$UserPrompt,
@@ -1332,12 +1338,14 @@ function Invoke-AIPyTeamOllamaCompletion {
     if (-not $script:ollamaEndpoint.EndsWith('/')) {
         $script:ollamaEndpoint += '/'
     }
-    Write-Verbose $ollamaJson
+    Write-Verbose "Constructed JSON payload for Ollama API: $ollamaJson"
+
     # Define the URL for the Ollama API endpoint
     $url = "$($script:ollamaEndpoint)api/generate"
+    Write-Verbose "Ollama API endpoint URL: $url"
 
     # Notify the user that the Ollama model is processing
-    Write-Host "++ Ollama ($ollamaModel) is working..."
+    Write-Host "++ Ollama model ($ollamaModel) is processing your request..."
 
     # Check if streaming is enabled and handle accordingly
     if ($Stream) {
@@ -1416,6 +1424,8 @@ function Invoke-AIPyTeamOllamaCompletion {
     $this.AddLogEntry("SystemPrompt:`n$SystemPrompt")
     $this.AddLogEntry("UserPrompt:`n$UserPrompt")
     $this.AddLogEntry("Response:`n$response")
+    
+    Write-Host "++ Ollama model ($ollamaModel) has successfully processed your request."
 
     return $response.Trim('"')
 }
