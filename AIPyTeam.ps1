@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 0.0.2
+.VERSION 0.0.3
 .GUID 2473f758-a87e-4f85-9e61-0331c3e88767
 .AUTHOR voytas75
 .TAGS python,ai,psaoai,llm,project,team,gpt,ollama,azure,bing,RAG
@@ -70,7 +70,7 @@ PS> "Monitor CPU usage and display dynamic graph." | AIPyTeam -Stream $false
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 0.0.2
+Version: 0.0.3
 Author: voytas75
 Creation Date: 2024.07
 
@@ -120,7 +120,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPyTeamVersion = "0.0.2"
+$AIPyTeamVersion = "0.0.3"
 
 #region ProjectTeamClass
 <#
