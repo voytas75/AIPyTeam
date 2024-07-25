@@ -3241,16 +3241,14 @@ do {
     Show-Header -HeaderText "MENU"
     Write-Host "Please select an option from the menu:"
     Write-Host "1. Suggest a new feature, enhancement, or change"
-    Write-Host "2. Analyze & modify with ..."
-    Write-Host "3. Analyze ... only"
-    Write-Host "4. Explain the code"
-    Write-Host "5. Ask a specific question about the code"
-    Write-Host "6. Generate documentation"
-    Write-Host "7. Show the code with research"
-    Write-Host "8. Save Project State"
-    Write-Host "9. Code Refactoring Suggestions"
-    Write-Host "10. Security Audit"
-    Write-Host "11. Open project folder in file explorer"
+    Write-Host "2. Explain the code"
+    Write-Host "3. Ask a specific question about the code"
+    Write-Host "4. Generate documentation"
+    Write-Host "5. Show the code with research"
+    Write-Host "6. Save Project State"
+    Write-Host "7. Code Refactoring Suggestions"
+    Write-Host "8. Security Audit"
+    Write-Host "9. Open project folder in file explorer"
     if (Test-Path -Path (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")) {
         Write-Host "(E) Display content of (e)rror.txt"
     }
@@ -3288,16 +3286,6 @@ do {
                 }
             }
             '2' {
-                # Option 2: Analyze & modify with PSScriptAnalyzer
-                Show-Header -HeaderText "Analyze & modify with ...."
-
-            }
-            '3' {
-                # Option 3: Analyze PSScriptAnalyzer only
-                Show-Header -HeaderText "Analyze ... only"
-
-            }
-            '4' {
                 # Option 4: Explain the code
                 Show-Header -HeaderText "Explain the code"
                 $promptMessage = "Explain the code only.`n`n"
@@ -3312,7 +3300,7 @@ do {
                     Write-Error "!! An error occurred while processing the input: $_"
                 }
             }
-            '5' {
+            '3' {
                 # Option 5: Ask a specific question about the code
                 Show-Header -HeaderText "Ask a specific question about the code"
                 try {
@@ -3339,7 +3327,7 @@ do {
                     Write-Error "!! An unexpected error occurred: $_"
                 }
             }
-            '6' {
+            '4' {
                 # Option 6: Generate documentation
                 Show-Header -HeaderText "Generate documentation"
                 try {
@@ -3374,7 +3362,7 @@ do {
                     Write-Error "!! An unexpected error occurred: $_"
                 }
             }
-            '7' {
+            '5' {
                 # Option 7: Show the code
                 Show-Header -HeaderText "Show the code with research"
                 Write-Output $GlobalState.lastpydevCode
@@ -3388,7 +3376,7 @@ do {
                 # Perform cyclomatic complexity analysis
                 Write-Verbose "`$lastpydevCode: $($GlobalState.lastpydevCode)"
             }
-            '8' {
+            '6' {
                 Show-Header -HeaderText "Save Project State"
                 if (-not (Test-Path $ProjectfilePath)) {
                     try {
@@ -3418,7 +3406,7 @@ do {
                 }
                 
             }
-            '9' {
+            '7' {
                 # Option 9: Code Refactoring Suggestions
                 Show-Header -HeaderText "Code Refactoring Suggestions"
                 $promptMessage = "Provide suggestions for refactoring the code to improve readability, maintainability, and performance."
@@ -3447,7 +3435,7 @@ do {
                     Write-Output "Refactoring suggestions were not deployed."
                 }
             }
-            '10' {
+            '8' {
                 # Option 10: Security Audit
                 Show-Header -HeaderText "Security Audit"
                 $promptMessage = "Conduct a security audit of the code to identify potential vulnerabilities and ensure best security practices are followed. Show only security audit report."
@@ -3476,7 +3464,7 @@ do {
                     Write-Output "Security improvements were not deployed."
                 }
             }
-            '11' {
+            '9' {
                 # Option 11: Open project folder in file explorer
                 Show-Header -HeaderText "Open Project Folder in File Explorer"
                 try {
