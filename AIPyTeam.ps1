@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 0.0.1
+.VERSION 0.0.2
 .GUID 2473f758-a87e-4f85-9e61-0331c3e88767
 .AUTHOR voytas75
 .TAGS python,ai,psaoai,llm,project,team,gpt,ollama,azure,bing,RAG
@@ -17,7 +17,7 @@
 Emulates a team of AI-powered Agents with RAG collaborating on a Python project.
 
 .DESCRIPTION 
-This script simulates a team of AI-powered Agents with RAG, each with a unique role in executing a project. User input is processed by one AI specialist, who performs their task and passes the result to the next AI Agent. This process continues until all tasks are completed, leveraging AI to enhance efficiency and accuracy in project execution.
+This script simulates a team of AI-powered Agents with RAG, each with a unique role in executing a Python project. User input is processed by one AI specialist, who performs their task and passes the result to the next AI Agent. This process continues until all tasks are completed, leveraging AI to enhance efficiency and accuracy in project execution.
 
 .PARAMETER userInput 
 Defines the project outline as a string. The default is to monitor RAM usage and show a color block based on the load. This parameter can also accept input from the pipeline.
@@ -70,7 +70,7 @@ PS> "Monitor CPU usage and display dynamic graph." | AIPyTeam -Stream $false
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 0.0.1
+Version: 0.0.2
 Author: voytas75
 Creation Date: 2024.07
 
@@ -86,7 +86,7 @@ param(
     [Parameter(Mandatory = $false, HelpMessage = "Controls whether the output should be streamed live. Default is `$true.")]
     [bool] $Stream = $true,
     
-    [Parameter(Mandatory = $false, HelpMessage = "Disables the RAG (Retrieve and Generate) functionality.")]
+    [Parameter(Mandatory = $false, HelpMessage = "Disables the RAG functionality.")]
     [switch] $NORAG,
 
     [Parameter(Mandatory = $false, HelpMessage = "Disables the Project Manager functions when used.")]
@@ -120,7 +120,7 @@ param(
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
     [string]$LLMProvider = "AzureOpenAI"
 )
-$AIPyTeamVersion = "0.0.1"
+$AIPyTeamVersion = "0.0.2"
 
 #region ProjectTeamClass
 <#
@@ -1420,7 +1420,7 @@ function Invoke-AIPyTeamOllamaCompletion {
     return $response.Trim('"')
 }
 
-function Invoke-AIPyTeamLMStudioChatCompletion {
+function Invoke-AIPSTeamLMStudioChatCompletion {
     param (
         [string]$SystemPrompt,
         [string]$UserPrompt,
@@ -1434,10 +1434,13 @@ function Invoke-AIPyTeamLMStudioChatCompletion {
     )
     $response = ""
 
+    # Define headers for the HTTP request
     $headers = @{
         "Content-Type"  = "application/json"
-        "Authorization" = "Bearer '$ApiKey'"
+        "Authorization" = "Bearer $ApiKey"
     }
+
+    # Construct the JSON body for the request
     $bodyJSON = [ordered]@{
         'model'       = $Model
         'messages'    = @(
@@ -1455,12 +1458,12 @@ function Invoke-AIPyTeamLMStudioChatCompletion {
         'stream'      = $Stream
         'max_tokens'  = $GlobalState.maxtokens
     } | ConvertTo-Json
-    Write-Verbose $bodyJSON
-    # Call lm-studio
-    #if ($modelResponse.data.Count -ne 0) {
-    $InfoText = "++ LM Studio" + $(if ($Model) { " ($Model)" } else { "" }) + " is working..."
+
+    Write-Verbose "Request Body JSON: $bodyJSON"
+
+    # Inform the user that the request is being processed
+    $InfoText = "++ LM Studio" + $(if ($Model) { " model ($Model)" } else { "" }) + " is processing your request..."
     Write-Host $InfoText
-    #}
 
     $url = "$($endpoint)chat/completions"
 
@@ -1476,7 +1479,7 @@ function Invoke-AIPyTeamLMStudioChatCompletion {
         $httpClient = [System.Net.Http.HttpClient]::new($httpClientHandler)
             
         # Set the required headers
-        $httpClient.DefaultRequestHeaders.Add("api-key", $script:lmstudioApiKey)
+        $httpClient.DefaultRequestHeaders.Add("api-key", $ApiKey)
             
         # Set the timeout for the HttpClient
         $httpClient.Timeout = New-TimeSpan -Seconds $timeoutSec
@@ -1506,7 +1509,6 @@ function Invoke-AIPyTeamLMStudioChatCompletion {
         $completeText = ""
         while ($null -ne ($line = $reader.ReadLine()) -or (-not $reader.EndOfStream)) {
             # Check if the line starts with "data: " and is not "data: [DONE]"
-            #Write-Verbose $line
             if ($line.StartsWith("data: ") -and $line -ne "data: [DONE]") {
                 # Extract the JSON part from the line
                 $jsonPart = $line.Substring(6)    
@@ -1522,7 +1524,7 @@ function Invoke-AIPyTeamLMStudioChatCompletion {
                     Write-Host $delta -NoNewline -ForegroundColor White
                 }
                 catch {
-                    Write-Error $_
+                    Write-Error "Error parsing JSON: $_"
                 }
             }
         }
@@ -1560,6 +1562,9 @@ function Invoke-AIPyTeamLMStudioChatCompletion {
     [void]($this.AddLogEntry("SystemPrompt:`n$SystemPrompt"))
     [void]($this.AddLogEntry("UserPrompt:`n$UserPrompt"))
     [void]($this.AddLogEntry("Response:`n$Response"))
+    
+    $InfoText = "++ LM Studio" + $(if ($Model) { " model ($Model)" } else { "" }) + " has successfully processed your request."
+    Write-Host $InfoText
 
     return $response
 }
