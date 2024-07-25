@@ -1,6 +1,6 @@
 # AI Python Team with RAG
 
-![AIPyTeam](https://github.com/voytas75/AIPyTeam/blob/master/images/AIPyTeam.png?raw=true "aipyteam")
+![AIPyTeam](https://github.com/voytas75/AIPyTeam/blob/master/images/aipyteam.png?raw=true "aipyteam")
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/A0A6KYBUS)
 
