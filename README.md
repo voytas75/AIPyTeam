@@ -4,7 +4,7 @@
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/A0A6KYBUS)
 
-[![PowerShell Gallery](https://img.shields.io/powershellgallery/dt/AIPyTeam)](https://www.powershellgallery.com/packages/AIPyTeam)
+[![PowerShell Gallery](https://img.shields.io/powershellgallery/dt/AIPyTeam)](https://www.powershellgallery.com/packages/AIPyTeam) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/f5d2f35fe975465c8111f3e14fd57ed3)](https://app.codacy.com/gh/voytas75/AIPyTeam/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
 ## Table of Contents
 
