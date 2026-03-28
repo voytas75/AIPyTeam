@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  powershell-static-smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse main PowerShell script
+        shell: pwsh
+        run: |
+          $parseErrors = $null
+          $tokens = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path './AIPyTeam.ps1'), [ref]$tokens, [ref]$parseErrors)
+
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+
+          $hasMarker = Select-String -Path ./AIPyTeam.ps1 -Pattern 'AIPyTeam' -Quiet
+          if (-not $hasMarker) {
+            throw 'Missing expected AIPyTeam script surface marker'
+          }
+
+          Write-Host 'AIPyTeam static PowerShell parse checks passed.'
+
+# Intentionally lightweight:
+# - validates the main PowerShell script parses cleanly
+# - avoids fake runtime claims for an interactive/provider-heavy agent script
