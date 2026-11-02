@@ -7,7 +7,37 @@ on:
     branches: [master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
+  windows-offline:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [powershell.exe, pwsh.exe]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Existing offline suites (native runtime)
+        shell: pwsh
+        env:
+          NATIVE_RUNTIME: ${{ matrix.runtime }}
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP ('aipyteam-offline-' + $env:NATIVE_RUNTIME)
+          & $env:NATIVE_RUNTIME -NoProfile -NonInteractive -File ./tools/Invoke-OfflineCI.ps1 -RepositoryRoot $env:GITHUB_WORKSPACE -EvidenceRoot $evidence
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload bounded offline receipts and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-${{ matrix.runtime }}
+          path: ${{ runner.temp }}/aipyteam-offline-${{ matrix.runtime }}/artifacts/*
+          if-no-files-found: error
+          retention-days: 7
+
   powershell-static-smoke:
     runs-on: ubuntu-latest
 
