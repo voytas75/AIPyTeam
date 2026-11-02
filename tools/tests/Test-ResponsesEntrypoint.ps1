@@ -1,4 +1,4 @@
-param([string]$RepositoryRoot,[string]$EvidenceRoot,[switch]$Resume,[switch]$RetainedResponse,[switch]$DefaultAzure,[ValidateSet('Responses','ChatCompletions','Legacy')][string]$RecoveryProtocol='Responses',[switch]$PartialRecovery,[switch]$NOInteraction,[switch]$ReducedWorkflow,[int]$FailAt=0,[switch]$RejectDeveloper,[switch]$SavedReduced,[switch]$OmitSkipFlags,[switch]$PipelineScalar,[switch]$ConfiguredRAG,[switch]$LMStudio,[switch]$WithKey,[string]$ActualRecovery,[switch]$LateRejected,[switch]$FailedSave)
+param([string]$RepositoryRoot,[string]$EvidenceRoot,[switch]$Resume,[switch]$RetainedResponse,[switch]$DefaultAzure,[ValidateSet('Responses','ChatCompletions','Legacy')][string]$RecoveryProtocol='Responses',[switch]$PartialRecovery,[switch]$NOInteraction,[switch]$ReducedWorkflow,[int]$FailAt=0,[switch]$RejectDeveloper,[switch]$SavedReduced,[switch]$OmitSkipFlags,[switch]$PipelineScalar,[switch]$ConfiguredRAG,[switch]$LMStudio,[switch]$WithKey,[string]$ActualRecovery,[switch]$LateRejected,[switch]$FailedSave,[switch]$SearchFailure,[switch]$SearchFallback)
 $ErrorActionPreference='Stop'
 New-Item -ItemType Directory -Force $EvidenceRoot|Out-Null
 $modules=Join-Path $EvidenceRoot 'modules'
@@ -10,7 +10,8 @@ $global:posts=0;$global:gets=0;$global:webs=0
 if($ActualRecovery){$Resume=$true}
 $env:OPENAI_API_BASE='https://fixture.invalid/v1/'
 $env:OPENAI_API_KEY=if($WithKey){'synthetic-local'}else{''}
-$env:AZURE_BING_API_KEY='synthetic-bing';$env:AZURE_BING_SEARCH_ENDPOINT='https://bing.fixture.invalid/'
+$env:SERPAPI_API_KEY='synthetic-search'
+$env:EXA_API_KEY=if($SearchFallback){'synthetic-exa'}else{''};$env:SERPER_API_KEY=''
 function Get-UserHash {
  $e=[Environment]::GetEnvironmentVariables('User');$text=(@($e.Keys|Sort-Object -CaseSensitive)|ForEach-Object {"$_=$($e[$_])"}) -join "`n"
  $sha=[Security.Cryptography.SHA256]::Create();([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($text)))).Replace('-','')
@@ -43,10 +44,11 @@ function global:Invoke-RestMethod {param($Uri,$Headers,$Method,$Body,$TimeoutSec
   $b=$Body|ConvertFrom-Json;if($b.model -ne 'local-model' -or $b.stream -or $b.max_tokens -ne 256){throw 'Local payload mismatch'}
   $global:posts++;return @{choices=@(@{message=@{content="4. Python code:`n"+'```python'+"`nx = 1`n"+'```'+"`n5. Usage Example:"}})}
  }
- if($ConfiguredRAG -and $Uri -eq 'https://bing.fixture.invalid/v7.0/search'){
-  if($Headers['Ocp-Apim-Subscription-Key'] -ne 'synthetic-bing'){throw 'Bing auth mismatch'}
-  $global:gets++;return @{webPages=@{value=@(@{url='https://article.fixture.invalid/';name='Fixture';snippet='Synthetic'})}}
+ if($ConfiguredRAG -and $Uri -like 'https://serpapi.com/search?*'){
+  if($Uri -notlike '*api_key=synthetic-search*'){throw 'Search auth mismatch'}
+  $global:gets++;if($SearchFailure -or $SearchFallback){throw 'private-search-transport-marker'};return @{organic_results=@(@{link='https://article.fixture.invalid/'})}
  }
+ if($ConfiguredRAG -and $Uri -eq 'https://api.exa.ai/search'){if($Headers.Authorization -ne 'Bearer synthetic-exa'){throw 'EXA auth mismatch'};$global:gets++;return @{results=@(@{url='https://article.fixture.invalid/'})}}
  if($Uri -ne 'https://fixture.invalid/openai/v1/responses' -or $Method -ne 'POST' -or $Headers['api-key'] -ne 'synthetic-key'){throw 'Unexpected Responses transport'}
  $b=$Body|ConvertFrom-Json
  if($b.max_output_tokens -ne 256 -or $TimeoutSec -ne 60 -or $b.store -ne $false -or $b.stream -ne $false -or $b.model -ne 'opaque-alias'){throw 'Budget/payload mismatch'}
@@ -103,12 +105,13 @@ $expectedStream=($Resume -and $RecoveryProtocol -ne 'Responses')
 if(-not $LMStudio -and ($saved.AzureOpenAIProtocol -ne $expectedProtocol -or $saved.Stream -ne $expectedStream -or $saved.AzureResponsesTimeoutSec -ne 60 -or $saved.LLMProvider -ne 'AzureOpenAI')){throw 'Saved protocol/stream/budget changed'}
 if($PartialRecovery -or $ActualRecovery -or $LateRejected -or ($FailAt -gt 2)){if($saved.WorkflowOutcome -ne 'Partial' -or $saved.FailedStage -ne 'Analyst/Developer' -or $saved.WorkflowErrorCode -ne 'StageFailed'){throw 'Recovery cleared partial outcome'}}
 elseif($Resume){if($saved.WorkflowOutcome -ne 'NotRecorded'){throw 'Recovery invented historical completion'}}
+elseif($SearchFailure){if($saved.WorkflowOutcome -ne 'Failed' -or $saved.FailedStage -ne 'RAG' -or $saved.WorkflowErrorCode -ne 'StageFailed' -or $saved.LastpydevCode){throw 'Search failure outcome incorrect'}}
 elseif($FailAt -or $RejectDeveloper){if($saved.WorkflowOutcome -ne 'Failed' -or $saved.LastpydevCode){throw 'Failure outcome incorrect'}}
 else{if($saved.WorkflowOutcome -ne 'Completed' -or $saved.FailedStage -or $saved.WorkflowErrorCode){throw 'Success outcome incorrect'}}
 $final=Join-Path $saved.TeamDiscussionDataFolder TheCodeF.py
 $code=if(Test-Path $final){Get-Content $final -Raw}else{''}
 if($RetainedResponse){if($code -notmatch 'def greet' -or $code -notmatch 'def main' -or $code -match 'import greet|subprocess|unittest|Path\("greet.py"\)'){throw 'Retained export contaminated'};if($saved.LastpydevCode.Trim() -ne $code.Trim()){throw 'Saved production mismatch'}}
-elseif(-not ($FailAt -or $RejectDeveloper) -and ($code -notmatch '(?m)^x = 1' -or $code -match 'print\(x\)')){throw 'Export contaminated'}
-$expected=if($Resume){0}elseif($FailAt){$FailAt}elseif($LateRejected){4}elseif($ConfiguredRAG){5}elseif($RejectDeveloper -or $ReducedWorkflow){2}else{10}
+elseif(-not ($SearchFailure -or $FailAt -or $RejectDeveloper) -and ($code -notmatch '(?m)^x = 1' -or $code -match 'print\(x\)')){throw 'Export contaminated'}
+$expected=if($Resume){0}elseif($SearchFailure){1}elseif($FailAt){$FailAt}elseif($LateRejected){4}elseif($ConfiguredRAG){5}elseif($RejectDeveloper -or $ReducedWorkflow){2}else{10}
 if($global:posts -ne $expected -or ($NOInteraction -and $global:reads -ne 0)){throw "Dispatch/input count mismatch: posts=$global:posts expected=$expected reads=$global:reads"}
 @{pass=$true;resume=[bool]$Resume;defaultAzure=[bool]$DefaultAzure;recoveryProfile=$RecoveryProtocol;stream=$saved.Stream;posts=$global:posts;reads=$global:reads;reduced=$saved.ReducedWorkflow;outcome=$saved.WorkflowOutcome;sourceHash=(Get-FileHash $entry).Hash;protocol=$saved.AzureOpenAIProtocol;timeout=$saved.AzureResponsesTimeoutSec;project=$projects[0].FullName;final=$final;dependencies='owned fixtures';UserEnvironmentUnchanged=$true;UserHashBefore=$before;UserHashAfter=$after;gets=$global:gets;webs=$global:webs;originalEntry=$entry;pipelineScalar=[bool]$PipelineScalar}|ConvertTo-Json|Out-File (Join-Path $EvidenceRoot entrypoint.json) -Encoding utf8

@@ -10,7 +10,7 @@ if($PreflightCase){
  function global:Import-Module {param($Name,[switch]$Force) if($Force){$script:imports++;throw 'Bootstrap forbidden'};Microsoft.PowerShell.Core\Import-Module -Name $Name}
  function global:Invoke-RestMethod {$script:calls++;throw 'Transport forbidden'}
  function global:Invoke-WebRequest {$script:calls++;throw 'Transport forbidden'}
- foreach($name in 'PSAOAI_API_AZURE_OPENAI_ENDPOINT','PSAOAI_API_AZURE_OPENAI_KEY','AZURE_BING_API_KEY','AZURE_BING_SEARCH_ENDPOINT','OPENAI_API_BASE'){[Environment]::SetEnvironmentVariable($name,$null,'Process')}
+ foreach($name in 'PSAOAI_API_AZURE_OPENAI_ENDPOINT','PSAOAI_API_AZURE_OPENAI_KEY','SERPAPI_API_KEY','EXA_API_KEY','SERPER_API_KEY','OPENAI_API_BASE'){[Environment]::SetEnvironmentVariable($name,$null,'Process')}
  $args=@{NOInteraction=$true;NORAG=$true;DeploymentChat='opaque-alias'}
  if($PreflightCase -ne 'missing-input'){$args.UserInput='synthetic'}
  if($PreflightCase -eq 'blank-input'){$args.UserInput='   '}

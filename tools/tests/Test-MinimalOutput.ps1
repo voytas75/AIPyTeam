@@ -45,12 +45,12 @@ foreach($mode in 'normal','reduced','full','interactive','menu-normal','menu-min
  $ok=$exit -eq 0
  if($mode -in 'normal','menu-normal','rag-normal'){$ok=$ok -and $text.Contains('MODEL_PRIVATE_TEXT')}
  else {
-  $ok=$ok -and -not $text.Contains('MODEL_PRIVATE_TEXT') -and $text.Contains('++ Ustawienia efektywne:') -and $text.Contains('++ Podane parametry:')
-  if($mode -in 'reduced','full','interactive'){$logs=(Get-ChildItem $out -Filter '*.log' -Recurse|Where-Object {$_.Name -ne 'stdout.log'}|ForEach-Object {[IO.File]::ReadAllText($_.FullName)}) -join "`n";$ok=$ok -and $logs.Contains('MODEL_PRIVATE_TEXT') -and $text.Contains('++ Kod wygenerowany i zapisany:') -and $text.Contains('++ Stan projektu zapisany:')}
-  if($mode -eq 'savefail'){$ok=$ok -and -not $text.Contains('++ Stan projektu zapisany:') -and $text.Contains('SaveProjectState')}
-  if($mode -eq 'resume'){$ok=$ok -and $text.Contains('workflow=skrócony') -and $text.Contains('RAG=False') -and -not $text.Contains('Some values of the imported project:')}
+  $ok=$ok -and -not $text.Contains('MODEL_PRIVATE_TEXT') -and $text.Contains('++ Effective settings:') -and $text.Contains('++ Explicit parameters:')
+  if($mode -in 'reduced','full','interactive'){$logs=(Get-ChildItem $out -Filter '*.log' -Recurse|Where-Object {$_.Name -ne 'stdout.log'}|ForEach-Object {[IO.File]::ReadAllText($_.FullName)}) -join "`n";$ok=$ok -and $logs.Contains('MODEL_PRIVATE_TEXT') -and $text.Contains('++ Code exported to:') -and $text.Contains('++ Project state saved to:') -and $text.Contains('++ Manager: processing...') -and $text.Contains('++ Workflow outcome: Completed')}
+  if($mode -eq 'savefail'){$ok=$ok -and -not $text.Contains('++ Project state saved to:') -and $text.Contains('SaveProjectState')}
+  if($mode -eq 'resume'){$ok=$ok -and $text.Contains('workflow=reduced') -and $text.Contains('RAG=False') -and -not $text.Contains('Some values of the imported project:')}
   if($mode -eq 'interactive'){$ok=$ok -and $text.Contains('Please select an option')}
-  if($mode -in 'reject','stagefail'){$ok=$ok -and -not $text.Contains('++ Kod wygenerowany i zapisany:') -and $text.Contains('++ Wynik workflow: Failed')}
+  if($mode -in 'reject','stagefail'){$ok=$ok -and -not $text.Contains('++ Code exported to:') -and $text.Contains('++ Workflow outcome: Failed')}
  }
  $rows+=@{name=$mode;pass=[bool]$ok;exitCode=$exit}
 }
@@ -89,7 +89,7 @@ try {
  $capture=@(Export-AndWritePythonCodeBlocks -InputString ('```python'+"`nx = 1`n"+'```') -StartDelimiter '```python' -EndDelimiter '```' -OutputFilePath $target 6>&1)
  $result=@($capture|Where-Object {$_ -isnot [Management.Automation.InformationRecord]})
  $notice=($capture|Out-String)
- $ok=$result.Count -eq 1 -and $result[0] -eq $false -and -not $notice.Contains('++ Kod wygenerowany i zapisany:')
+ $ok=$result.Count -eq 1 -and $result[0] -eq $false -and -not $notice.Contains('++ Code exported to:')
 } finally {$lock.Dispose()}
 $ok=$ok -and [IO.File]::ReadAllText($target) -eq 'sentinel'
 $rows+=@{name='locked-export';pass=[bool]$ok;exitCode=0}
@@ -107,7 +107,7 @@ foreach($display in 'normal','minimal') {
    $args=@('-Resume','-NOInteraction','-ReducedWorkflow')
   } else {
    $fixture=$llama.Replace('RAG=$false;Stream=$true;ReducedWorkflow=$true','RAG=$true;Stream=$true;ReducedWorkflow=$false')
-   $fixture=$fixture.Replace("`$env:LLAMACPP_ENDPOINT='https://fixture.invalid/'","`$env:LLAMACPP_ENDPOINT='https://fixture.invalid/';`$env:AZURE_BING_API_KEY='synthetic-bing';`$env:AZURE_BING_SEARCH_ENDPOINT='https://bing.fixture.invalid/'")
+   $fixture=$fixture.Replace("`$env:LLAMACPP_ENDPOINT='https://fixture.invalid/'","`$env:LLAMACPP_ENDPOINT='https://fixture.invalid/';`$env:SERPAPI_API_KEY='synthetic-search'")
    $fixture=$fixture.Replace("$"+'args.Stream=$false}',"$"+'args.Stream=$false;$args.NORAG=$true;$args.ReducedWorkflow=$true;$args.LlamaCppTimeoutSec=17}')
    $fixture += "`nif(-not `$saved.RAG -or `$saved.ReducedWorkflow -or `$saved.Stream -or `$saved.LlamaCppModel -cne 'model-A' -or `$saved.LlamaCppTimeoutSec -ne 17){throw 'Local override/effective values lost'}"
    if($display -eq 'minimal'){$fixture=$fixture.Replace('& $source @args','& $source -MinimalOutput @args')}
@@ -116,7 +116,7 @@ foreach($display in 'normal','minimal') {
   $runner=Join-Path $out fixture.ps1;$fixture|Set-Content $runner -Encoding UTF8
   & $native -NoProfile -NonInteractive -File $runner -RepositoryRoot $RepositoryRoot -EvidenceRoot $out @args *> (Join-Path $out stdout.log)
   $ok=$LASTEXITCODE -eq 0;$text=Get-Content (Join-Path $out stdout.log) -Raw
-  if($display -eq 'minimal'){$ok=$ok -and $text.Contains('workflow=pełny; Stream=False; RAG=True')}
+  if($display -eq 'minimal'){$ok=$ok -and $text.Contains('workflow=full; Stream=False; RAG=True')}
   $rows+=@{name=('recovery-'+$provider+'-'+$display);pass=[bool]$ok;exitCode=$LASTEXITCODE}
  }
 }
@@ -127,13 +127,18 @@ $explicit=@{};foreach($p in $ast.ParamBlock.Parameters){$explicit[$p.Name.Variab
 $explicit.Verbose=$true;$explicit.Debug=$true
 $state=[pscustomobject]@{LLMProvider='AzureOpenAI';AzureOpenAIProtocol='Responses';ReducedWorkflow=$false;Stream=$false;RAG=$true}
 $capture=Show-AIPyTeamStartup $state $explicit 6>&1|Out-String
-$ok=-not $capture.Contains('PRIVATE_ARGUMENT_SENTINEL')
+$ok=-not $capture.Contains('PRIVATE_ARGUMENT_SENTINEL') -and $capture.Contains('++ Effective settings: provider=AzureOpenAI; protocol=Responses;') -and $capture.Contains('workflow=full; Stream=False; RAG=True') -and $capture.Contains('task description (supplied; content omitted)')
 foreach($name in $explicit.Keys){$ok=$ok -and $capture.Contains("++ -${name}:")}
-$ok=$ok -and -not $capture.Contains('parametr wspólny')
+$ok=$ok -and -not $capture.Contains('common parameter')
 $rows+=@{name='all-public-parameter-descriptions';pass=[bool]$ok;exitCode=0}
 $minimalParam=$ast.ParamBlock.Parameters|Where-Object {$_.Name.VariablePath.UserPath -eq 'MinimalOutput'}
 $ok=$minimalParam.StaticType -eq [Management.Automation.SwitchParameter] -and -not $minimalParam.DefaultValue
 $rows+=@{name='minimal-default-false';pass=[bool]$ok;exitCode=0}
+# Script-owned literals, including accentless Polish labels; not dynamic user/model data.
+$polishPattern='[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]|(?i)\b(przetwarza|przetwarzanie|recenzuje|podane|ustawienia|dostawca|parametr|modele|zapisany|wczytany|uruchamianie|koniec pracy|czyszczenie|uzupełnianie)\b'
+$literals=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.StringConstantExpressionAst] -or $n -is [Management.Automation.Language.ExpandableStringExpressionAst]},$true))
+$hits=@($literals|Where-Object {$_.Value -match $polishPattern})
+$rows+=@{name='script-owned-literals-English';pass=[bool]($errors.Count -eq 0 -and $hits.Count -eq 0);exitCode=0}
 # Native binder rejects unknown flags before dependency/workflow execution.
 $binding=Join-Path $EvidenceRoot binding.ps1
 ($ast.ParamBlock.Extent.Text+"`nthrow 'BINDER_DID_NOT_REJECT'")|Set-Content $binding -Encoding UTF8

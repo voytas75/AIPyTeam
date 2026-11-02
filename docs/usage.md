@@ -34,7 +34,7 @@ Use `-UserInput` or a scalar pipeline description. A synthetic, standard-library
 | `NOTips` / `VerbosePrompt` | Disable prompt tips / display prompts; neither is a security or execution safeguard. |
 | `LoadProjectStatus` | Load saved state rather than starting fresh. |
 
-Full workflow retains Manager → Developer, four reviewer/revision pairs (Analyst, Architect, Domain Expert, QA), optional Documentation and final Project report. Reduced mode skips all four pairs and both optional reports regardless of NOPM/NODocumentator, retaining draft export and final state save. With NORAG, successful reduced uses two inference requests; full with NOPM/NODocumentator uses ten, and full with both reports uses twelve. These are path counts, not global enforced request caps; retrieval and explicit menu actions can add calls. Failures stop automatic downstream stages.
+Full workflow retains Manager → Developer, four reviewer/revision pairs (Analyst, Architect, Domain Expert, QA), optional Documentation and final Project report. Reduced mode skips all four pairs and both optional reports regardless of NOPM/NODocumentator, retaining draft export and final state save. With NORAG, successful reduced uses two inference requests; full with NOPM/NODocumentator uses ten, and full with both reports uses twelve. These are path counts, not global enforced request caps; retrieval and explicit menu actions can add calls. RAG uses SerpApi → EXA → Serper with at least one configured Process key (SERPAPI_API_KEY, EXA_API_KEY, SERPER_API_KEY); see [RAG](rag.md) for fallback, logging and the preserved 5/25 completion paths. Failures stop automatic downstream stages.
 
 For a fuller review with both reports omitted, remove reduced mode explicitly from a fresh invocation:
 
@@ -44,9 +44,18 @@ For a fuller review with both reports omitted, remove reduced mode explicitly fr
 
 ## Minimal console output
 
-Append `-MinimalOutput` to an existing command (including recovery). Startup reports effective provider/protocol/model, workflow, Stream, RAG and noninteractive mode after state/provider resolution. A separate stable alphabetical list describes only explicitly supplied parameters in Polish; its invocation values do not override saved-state precedence. UserInput content is omitted; credentials/endpoints are not read or displayed by the new summary.
+Append `-MinimalOutput` to an existing command (including recovery). Startup reports effective provider/protocol/model, workflow, Stream, RAG and noninteractive mode after state/provider resolution. All script-owned notifications, questions, menus and parameter descriptions are in English in both display modes; user input, model text and external responses are not translated. A separate stable alphabetical list describes only explicitly supplied parameters in English; its invocation values do not override saved-state precedence. UserInput content is omitted; credentials/endpoints are not read or displayed by the new summary.
 
-Processing notices are synchronous, not a spinner. Export/save notices follow successful writes; workflow completion is not Python quality validation. Without the flag, model display stays unchanged; the startup summary is added in both modes. Interactive choices remain visible and usable.
+Processing notices are synchronous, not a spinner. Example script-owned output (model and paths vary):
+
+```text
+++ Effective settings: provider=AzureOpenAI; protocol=Responses; model=opaque-alias; workflow=reduced; Stream=False; RAG=False; noninteractive=True
+++ Manager: processing...
+++ Code exported to: C:\Projects\Draft\TheCode_v1.py
+++ Project state saved to: C:\Projects\Draft\Project.xml
+```
+
+Export/save notices follow successful writes; workflow completion is not Python quality validation. Without the flag, model display stays unchanged; the startup summary is added in both modes. Interactive choices remain visible and usable.
 
 This is **not a privacy mode**: team logs, saved state, exports and transcript remain enabled unless NOLog is separately selected. Logs can retain complete prompts/model text; hiding stdout does not guarantee a private transcript. PSAOAI imported by `#Requires` may print its own banner before parameters can be evaluated. No global information preference, environment banner setting or import policy is changed.
 

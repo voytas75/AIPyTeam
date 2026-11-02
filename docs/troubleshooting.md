@@ -16,7 +16,7 @@ This is an import correction, not banner suppression. A fresh dependency import 
 
 ## NOInteraction stops before inference
 
-Fresh input must be nonblank. Azure needs Process endpoint/key and deployment; LMStudio needs Process OPENAI_API_BASE even though interactive startup has a localhost default. Enabled RAG needs both Process Bing settings. Recovery needs an explicit XML file or a directory with exactly one XML file, and uses the saved active provider/RAG. Do not disable the fail-closed checks or insert literal credentials. See [provider setup](provider-configuration.md) and [RAG scopes](rag.md).
+Fresh input must be nonblank. Azure needs Process endpoint/key and deployment; LMStudio needs Process OPENAI_API_BASE even though interactive startup has a localhost default. Enabled RAG needs at least one nonblank Process key: SERPAPI_API_KEY, EXA_API_KEY or SERPER_API_KEY. Missing providers are skipped; all-provider failure stops the RAG stage. Recovery needs an explicit XML file or a directory with exactly one XML file, and uses the saved active provider/RAG. Do not disable the fail-closed checks or insert literal credentials. See [provider setup](provider-configuration.md) and [RAG scopes](rag.md).
 
 PowerShell #Requires resolves dependencies before these checks; the switch cannot guarantee no implicit imports/prompts inside dependencies. It suppresses AIPyTeam prompts/menu, not all output, discovery HTTP or provider calls.
 

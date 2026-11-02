@@ -6,7 +6,7 @@ Code-producing initial/revision and menu feature/refactoring/security requests s
 
 Active system boundaries include seven main roles, initial Manager override, RAG query manager, nested web-text cleaner and RAG analysis override. The latter appends trust instructions to the caller-supplied system prompt; it does not reinterpret intermediate queries as authoritative original tasks. Legacy memory/feedback helpers and ingestion Unicode processing remain unchanged and outside this slice.
 
-`NOTips` and `tipAmount` remain compatible inputs with no active monetary prompt effect. No stage, provider, transport budget, retry or pipeline change was introduced.
+`NOTips` and `tipAmount` remain compatible inputs with no active monetary prompt effect. The prompt modernization itself introduced no stage, provider, transport budget, retry or pipeline change. The separate bounded retrieval migration now uses SerpApi → EXA → Serper with sequential error/empty/malformed fallback and Process-only shared keys; it retains the query/cleaner/analysis dispatch and prompt boundaries. See [RAG](rag.md) for transport bounds and offline-only qualification.
 
 Offline CI includes native rendered-builder tests and original-filepath controlled request recording: reduced 2, full 10, full with optional reports 12, menu replay 11, initial RAG 5 and full RAG 25 mocked completion dispatches (including its nested cleaner). The menu replay covers feature, explanation, question, documentation, refactoring and security callers. Exact cases and final byte bindings belong to the closeout receipt; historical 140-case evidence is not final qualification.
 

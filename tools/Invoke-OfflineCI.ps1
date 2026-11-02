@@ -38,7 +38,8 @@ $suites = @(
     @{name='DependencyStartup';parameter='RepositoryRoot';count=4;receipt='receipt.json'},
     @{name='PromptContracts';parameter='RepositoryRoot';count=12;receipt='receipt.json'},
     @{name='PromptRequestChain';parameter='RepositoryRoot';count=6;receipt='receipt.json'},
-    @{name='MinimalOutput';parameter='RepositoryRoot';count=29;receipt='receipt.json'}
+    @{name='MinimalOutput';parameter='RepositoryRoot';count=30;receipt='receipt.json'},
+    @{name='RAGProviders';parameter='RepositoryRoot';count=40;receipt='receipt.json'}
 )
 # Fresh native process per suite. Never inspect inherited credential values.
 $wrapper = Join-Path $EvidenceRoot 'child.ps1'
@@ -46,7 +47,7 @@ $wrapper = Join-Path $EvidenceRoot 'child.ps1'
 param($Runner,$ParameterName,$Target,$OutputRoot)
 $ErrorActionPreference='Stop'
 foreach($name in @([Environment]::GetEnvironmentVariables('Process').Keys)) {
-    if ($name -match '^(PSAOAI_|AZURE_|OPENAI_|ANTHROPIC_|OLLAMA_|LMSTUDIO_|LLAMACPP_|GOOGLE_API_|GEMINI_API_|HF_TOKEN$)') {
+    if ($name -match '^(SERPAPI_|EXA_|SERPER_|PSAOAI_|AZURE_|OPENAI_|ANTHROPIC_|OLLAMA_|LMSTUDIO_|LLAMACPP_|GOOGLE_API_|GEMINI_API_|HF_TOKEN$)') {
         [Environment]::SetEnvironmentVariable($name,$null,'Process')
     }
 }

@@ -45,7 +45,7 @@ From the checkout directory, with the existing Process deployment configured:
 - Fresh Azure defaults to Responses with omitted Stream=false. Streaming/SSE is unsupported for Responses.
 - 10240 tokens / HTTP120s is an explicit historical transport profile, **not** the product defaults of 20480 / HTTP60s, a workflow deadline or fresh live acceptance of current bytes.
 
-For concise console output, append `-MinimalOutput`: Polish startup settings and explicitly supplied parameter descriptions, processing notices and confirmed export/save notices instead of model text. It is invocation-only and independent of `-NOInteraction` and `-NOLog`; logs may still contain complete model text. Dependency banners from `#Requires` are not suppressed.
+For concise console output, append `-MinimalOutput`: English startup settings and explicitly supplied parameter descriptions, processing notices and confirmed export/save notices instead of model text. It is invocation-only and independent of `-NOInteraction` and `-NOLog`; logs may still contain complete model text. Dependency banners from `#Requires` are not suppressed.
 
 ## Results and recovery
 
@@ -65,7 +65,7 @@ Recovery honors saved settings and does not certify completion. Keep independent
 
 - [Provider configuration](docs/provider-configuration.md): secure Azure and local backend setup.
 - [Usage and parameters](docs/usage.md): modes, full workflow, outputs and recovery.
-- [RAG](docs/rag.md): optional Bing retrieval and data handling.
+- [RAG](docs/rag.md): optional SerpApi → EXA → Serper retrieval and data handling.
 - [Troubleshooting](docs/troubleshooting.md): startup, transport and draft failures.
 - [llama.cpp](docs/llama-cpp.md): dedicated local provider, buffered SSE and recovery.
 - [Azure Responses](docs/azure-responses.md): protocol contract and historical evidence.
