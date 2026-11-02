@@ -117,14 +117,26 @@ param(
     [int] $MaxTokens = 20480,
 
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the LLM provider to use (e.g., OpenAI, AzureOpenAI).")]
-    [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
+    [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI", "llama.cpp" )]
     [string]$LLMProvider = "AzureOpenAI",
 
     [ValidateSet('ChatCompletions', 'Responses')]
     [string]$AzureOpenAIProtocol = 'Responses',
 
     [ValidateRange(1, 2147483647)]
-    [int]$AzureResponsesTimeoutSec = 60
+    [int]$AzureResponsesTimeoutSec = 60,
+
+    [Parameter(HelpMessage = 'Invocation-only: no input prompts or menu. Fresh runs require UserInput and configured provider/RAG settings.')]
+    [switch]$NOInteraction,
+
+    [Parameter(HelpMessage = 'Generate the Manager/Developer draft only; skip reviews, documentation and final PM report. Saved state overrides this switch.')]
+    [switch]$ReducedWorkflow,
+
+    [Parameter(HelpMessage = 'Exact advertised llama.cpp model ID; omitted selects the first discovered model. No separate model environment variable.')]
+    [string]$LlamaCppModel,
+
+    [ValidateRange(1, 3600)]
+    [int]$LlamaCppTimeoutSec = 240
 )
 $AIPyTeamVersion = "0.1.0"
 
@@ -1150,6 +1162,9 @@ function Get-ProjectState {
                     $projectState | Add-Member -NotePropertyName $field -NotePropertyValue $default
                 }
             }
+            if (-not $projectState.PSObject.Properties['ReducedWorkflow']) {
+                $projectState | Add-Member -NotePropertyName ReducedWorkflow -NotePropertyValue $false
+            }
             # Return the updated GlobalState object
             return $projectState
         }
@@ -1334,6 +1349,89 @@ function Invoke-AIPyTeamAzureResponses {
     return Read-AIPyTeamResponsesResponse -Response $response
 }
 
+function Resolve-AIPyTeamLlamaCppEndpoint {
+    param([string]$Endpoint)
+    $uri = $null
+    if ([string]::IsNullOrWhiteSpace($Endpoint) -or -not [Uri]::TryCreate($Endpoint, [UriKind]::Absolute, [ref]$uri) -or
+        $uri.Scheme -notin @('http','https') -or $uri.UserInfo -or $uri.Query -or $uri.Fragment) {
+        throw 'llama.cpp requires a valid HTTP(S) LLAMACPP_ENDPOINT without credentials, query or fragment.'
+    }
+    $base = $Endpoint.TrimEnd('/')
+    if ($uri.AbsolutePath.TrimEnd('/') -notin @('', '/v1')) { throw 'llama.cpp endpoint must be the server root or /v1.' }
+    if (-not $base.EndsWith('/v1')) { $base += '/v1' }
+    return $base + '/'
+}
+
+function New-AIPyTeamLlamaCppRequest {
+    param([string]$Endpoint, [string]$Model, [string]$ApiKey, [string]$SystemPrompt, [string]$UserPrompt,
+        [double]$Temperature = 0.7, [double]$TopP = 0.9, [ValidateRange(1,2147483647)][int]$MaxTokens = 20480,
+        [ValidateRange(1,3600)][int]$TimeOut = 240, [bool]$Stream = $true)
+    if ([string]::IsNullOrWhiteSpace($Model)) { throw 'llama.cpp requires a nonblank advertised model ID.' }
+    $headers = @{}
+    if (-not [string]::IsNullOrWhiteSpace($ApiKey)) { $headers.Authorization = "Bearer $ApiKey" }
+    return @{Uri=((Resolve-AIPyTeamLlamaCppEndpoint $Endpoint)+'chat/completions');Headers=$headers;TimeoutSec=$TimeOut;
+        Body=(@{model=$Model;messages=@(@{role='system';content=$SystemPrompt},@{role='user';content=$UserPrompt});
+            temperature=$Temperature;top_p=$TopP;max_tokens=$MaxTokens;stream=$Stream}|ConvertTo-Json -Depth 6 -Compress)}
+}
+
+function ConvertFrom-AIPyTeamLlamaCppResponse {
+    param($Result)
+    if ($Result.error -or @($Result.choices).Count -ne 1 -or $Result.choices[0].message.content -isnot [string] -or
+        [string]::IsNullOrWhiteSpace($Result.choices[0].message.content)) { throw 'Invalid or empty llama.cpp response.' }
+    return $Result.choices[0].message.content.Trim()
+}
+
+function ConvertFrom-AIPyTeamLlamaCppSSE {
+    param([string]$Text)
+    $response = ''; $done = $false
+    foreach ($line in ($Text -split "`r?`n")) {
+        if (-not $line.StartsWith('data:')) { continue }
+        $data = $line.Substring(5).Trim()
+        if ($data -eq '[DONE]') { $done = $true; break }
+        $chunk = $data | ConvertFrom-Json -ErrorAction Stop
+        if ($chunk.error -or @($chunk.choices).Count -ne 1 -or $null -eq $chunk.choices[0].delta) { throw 'Invalid llama.cpp stream event.' }
+        $delta = $chunk.choices[0].delta.content
+        if ($null -ne $delta -and $delta -isnot [string]) { throw 'Invalid llama.cpp content delta.' }
+        $response += $delta
+    }
+    if (-not $done -or [string]::IsNullOrWhiteSpace($response)) { throw 'Incomplete or empty llama.cpp stream.' }
+    return $response.Trim()
+}
+
+function Invoke-AIPyTeamLlamaCppChatCompletion {
+    param([string]$SystemPrompt, [string]$UserPrompt, [double]$Temperature, [double]$TopP,
+        [string]$Model, [string]$ApiKey, [string]$Endpoint, [int]$MaxTokens = 20480,
+        [int]$TimeOut = 240, [bool]$Stream = $true)
+    $client = $null; $request = $null; $httpResponse = $null
+    try {
+        $r = New-AIPyTeamLlamaCppRequest @PSBoundParameters
+        Add-Type -AssemblyName System.Net.Http
+        # An explicitly injected fixture factory is optional; normal execution always uses real HttpClient.
+        if (Get-Command New-AIPyTeamLlamaCppHttpClient -CommandType Function -ErrorAction SilentlyContinue) {
+            $client = New-AIPyTeamLlamaCppHttpClient
+        } else {
+            $handler = [Net.Http.HttpClientHandler]::new()
+            $handler.AllowAutoRedirect = $false; $handler.UseCookies = $false
+            $client = [Net.Http.HttpClient]::new($handler)
+        }
+        $client.Timeout = [TimeSpan]::FromSeconds($r.TimeoutSec)
+        $request = [Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::Post,$r.Uri)
+        if ($r.Headers.Authorization) { $request.Headers.Add('Authorization',$r.Headers.Authorization) }
+        $request.Content = [Net.Http.StringContent]::new($r.Body,[Text.Encoding]::UTF8,'application/json')
+        # Buffered SSE bounds the entire response by HttpClient.Timeout, not merely headers.
+        $httpResponse = $client.SendAsync($request).GetAwaiter().GetResult()
+        if (-not $httpResponse.IsSuccessStatusCode) { throw 'HTTP failure' }
+        $text = $httpResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+        if ($Stream) { $response = ConvertFrom-AIPyTeamLlamaCppSSE $text }
+        else { $response = ConvertFrom-AIPyTeamLlamaCppResponse ($text|ConvertFrom-Json -ErrorAction Stop) }
+        Write-Host '++ llama.cpp has successfully processed your request.'
+        return $response
+    } catch { throw '-- llama.cpp chat completion failed. Check model, response, server availability and authentication.' }
+    finally {
+        if ($httpResponse) { $httpResponse.Dispose() }; if ($request) { $request.Dispose() }; if ($client) { $client.Dispose() }
+    }
+}
+
 function Invoke-LLMChatCompletion {
     param (
         [string]$Provider,
@@ -1364,6 +1462,10 @@ function Invoke-LLMChatCompletion {
             "ollama" {
                 # Invoke the Ollama model completion function
                 $response = Invoke-AIPyTeamOllamaCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -ollamaModel $ollamamodel -Stream $Stream
+                return $response
+            }
+            "llama.cpp" {
+                $response = Invoke-AIPyTeamLlamaCppChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -ApiKey $script:llamaCppApiKey -Endpoint $script:llamaCppApiBase -Model $script:ResolvedLlamaCppModel -MaxTokens $MaxTokens -TimeOut $script:GlobalState.LlamaCppTimeoutSec
                 return $response
             }
             "LMStudio" {
@@ -1766,6 +1868,7 @@ function Invoke-BingWebSearch {
 
     # Ensure the API key is provided, prompt the user if not
     while ([string]::IsNullOrEmpty($apiKey) -or [string]::IsNullOrWhiteSpace($apiKey)) {
+        if ($NOInteraction) { throw 'NOInteraction requires configured Bing key.' }
         $apiKey = Read-Host -Prompt "Please enter your AZURE Bing API key"
         if ($apiKey) {
             [System.Environment]::SetEnvironmentVariable("AZURE_BING_API_KEY", $apiKey, "User")
@@ -1775,6 +1878,7 @@ function Invoke-BingWebSearch {
 
     # Ensure the endpoint is provided, prompt the user if not
     while ([string]::IsNullOrEmpty($endpoint) -or [string]::IsNullOrWhiteSpace($endpoint)) {
+        if ($NOInteraction) { throw 'NOInteraction requires configured Bing endpoint.' }
         $endpoint = Read-Host -Prompt "Please enter the AZURE Bing Web Search Endpoint"
         if ($endpoint) {
             [System.Environment]::SetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", $endpoint, "User")
@@ -1807,9 +1911,14 @@ function Invoke-BingWebSearch {
 
     # Ensure the endpoint is provided, prompt the user if not
     while ([string]::IsNullOrEmpty($Endpoint)) {
+        if ($NOInteraction) { throw 'NOInteraction requires configured Bing endpoint.' }
         $Endpoint = Read-Host -Prompt "Please enter the AZURE Bing Web Search Endpoint"
     }
-    [System.Environment]::SetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", $Endpoint, "User")
+    if ($NOInteraction) {
+        [System.Environment]::SetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", $Endpoint, "Process")
+    } else {
+        [System.Environment]::SetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", $Endpoint, "User")
+    }
     $endpoint += "v7.0/search"
     Write-Verbose "Final endpoint set to $endpoint."
         
@@ -2061,7 +2170,8 @@ $($userInput.trim())
                 Write-Verbose "Log entry added: $LogEntry"
 
                 # Perform the web search using the shortened user input
-                $WebResults = Invoke-BingWebSearch -query $ShortenedUserInput -count $MaxCount -apiKey ([System.Environment]::GetEnvironmentVariable("AZURE_BING_API_KEY", "User")) -endpoint ([System.Environment]::GetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", "User"))
+                $ragConfigurationScope = if ($NOInteraction) { 'Process' } else { 'User' }
+                $WebResults = Invoke-BingWebSearch -query $ShortenedUserInput -count $MaxCount -apiKey ([System.Environment]::GetEnvironmentVariable("AZURE_BING_API_KEY", $ragConfigurationScope)) -endpoint ([System.Environment]::GetEnvironmentVariable("AZURE_BING_SEARCH_ENDPOINT", $ragConfigurationScope))
                 Write-Verbose "Web search performed with query: $ShortenedUserInput"
             }
             catch {
@@ -2545,6 +2655,44 @@ $originalCulture = [Threading.Thread]::CurrentThread.CurrentUICulture
 # Set the current UI culture to 'en-US' for consistent behavior
 [void]([Threading.Thread]::CurrentThread.CurrentUICulture = [System.Globalization.CultureInfo]::CreateSpecificCulture('en-US'))
 
+# Fail closed before module bootstrap/discovery for unattended invocations.
+if ($NOInteraction) {
+    if (-not $LoadProjectStatus -and [string]::IsNullOrWhiteSpace($UserInput)) {
+        throw 'NOInteraction requires nonblank UserInput for a fresh project.'
+    }
+    $preflightProvider = $LLMProvider
+    $preflightRAG = -not $NORAG
+    if ($LoadProjectStatus) {
+        if (Test-Path -LiteralPath $LoadProjectStatus -PathType Container) {
+            $candidates = @(Get-ChildItem -LiteralPath $LoadProjectStatus -Filter *.xml -File)
+            if ($candidates.Count -ne 1) { throw 'NOInteraction recovery requires an explicit XML file or a directory containing exactly one XML file.' }
+            $LoadProjectStatus = $candidates[0].FullName
+        }
+        $preflightState = Get-ProjectState -FilePath $LoadProjectStatus
+        if (-not $preflightState) { throw 'Project state could not be loaded.' }
+        $preflightProvider = $preflightState.LLMProvider
+        $preflightRAG = $preflightState.RAG
+    }
+    $requiredSettings = switch ($preflightProvider) {
+        'AzureOpenAI' { 'PSAOAI_API_AZURE_OPENAI_ENDPOINT'; 'PSAOAI_API_AZURE_OPENAI_KEY' }
+        'LMStudio' { 'OPENAI_API_BASE' }
+        'llama.cpp' { 'LLAMACPP_ENDPOINT' }
+        'OpenAI' { 'OPENAI_API_KEY' }
+        'ollama' { }
+    }
+    if ($preflightRAG) { $requiredSettings += @('AZURE_BING_API_KEY','AZURE_BING_SEARCH_ENDPOINT') }
+    foreach ($setting in $requiredSettings) {
+        if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($setting,'Process'))) {
+            throw "NOInteraction requires configured Process setting: $setting."
+        }
+    }
+    if ($preflightProvider -eq 'llama.cpp') { $null = Resolve-AIPyTeamLlamaCppEndpoint $env:LLAMACPP_ENDPOINT }
+    if ($preflightProvider -eq 'AzureOpenAI') {
+        if (-not $PSBoundParameters.ContainsKey('DeploymentChat')) { $DeploymentChat = $env:PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT }
+        if ([string]::IsNullOrWhiteSpace($DeploymentChat)) { throw 'NOInteraction requires configured Azure deployment.' }
+    }
+}
+
 # Check if the PSAOAI module version is at least 0.3.2
 if ( Test-ModuleMinVersion -ModuleName PSAOAI -MinimumVersion "0.3.2" ) {
     # Import the PSAOAI module forcefully
@@ -2586,6 +2734,7 @@ if (-not $LoadProjectStatus) {
         NOLog                    = $NOLog
         NODocumentator           = $NODocumentator
         NOPM                     = $NOPM
+        ReducedWorkflow          = [bool]$ReducedWorkflow
         RAG                      = $RAG
         Stream                   = $Stream
         LLMProvider              = $LLMProvider
@@ -2724,9 +2873,44 @@ if ($GlobalState.LLMProvider -eq 'ollama') {
     if (-not (Test-OllamaAPI)) { throw 'Ollama API is not reachable.' }
     $runningModelOllama = Test-OllamaRunningModel
     if (-not $runningModelOllama) { throw 'No running Ollama model.' }
-    Set-EnvOllamaModel -model $runningModelOllama
+    if ($NOInteraction) {
+        $script:ollamaModel = $runningModelOllama
+    } else {
+        Set-EnvOllamaModel -model $runningModelOllama
+    }
 }
 #endregion ollama
+
+#region llama.cpp
+if ($GlobalState.LLMProvider -eq 'llama.cpp') {
+    $script:ResolvedLlamaCppModel = $null
+    $script:llamaCppApiKey = [Environment]::GetEnvironmentVariable('LLAMACPP_API_KEY','Process')
+    $script:llamaCppApiBase = Resolve-AIPyTeamLlamaCppEndpoint ([Environment]::GetEnvironmentVariable('LLAMACPP_ENDPOINT','Process'))
+    if ($LoadProjectStatus -and -not $PSBoundParameters.ContainsKey('LlamaCppModel') -and $GlobalState.PSObject.Properties['LlamaCppModel']) {
+        if ([string]::IsNullOrWhiteSpace($GlobalState.LlamaCppModel)) { throw 'Invalid saved llama.cpp model ID.' }
+        $LlamaCppModel = $GlobalState.LlamaCppModel
+    }
+    if ($LoadProjectStatus -and -not $PSBoundParameters.ContainsKey('LlamaCppTimeoutSec') -and $GlobalState.PSObject.Properties['LlamaCppTimeoutSec']) {
+        $LlamaCppTimeoutSec = $GlobalState.LlamaCppTimeoutSec
+    }
+    if ($LoadProjectStatus -and $PSBoundParameters.ContainsKey('Stream')) { $GlobalState.Stream = $Stream }
+    if ($LlamaCppTimeoutSec -lt 1 -or $LlamaCppTimeoutSec -gt 3600) { throw 'Invalid saved llama.cpp timeout.' }
+    if ($PSBoundParameters.ContainsKey('LlamaCppModel') -and [string]::IsNullOrWhiteSpace($LlamaCppModel)) { throw 'llama.cpp model override must be nonblank.' }
+    $headers = @{}
+    if (-not [string]::IsNullOrWhiteSpace($script:llamaCppApiKey)) { $headers.Authorization = "Bearer $script:llamaCppApiKey" }
+    try {
+        $catalog = Invoke-RestMethod -Uri ($script:llamaCppApiBase+'models') -Method GET -Headers $headers -TimeoutSec $LlamaCppTimeoutSec -ErrorAction Stop
+        $models = @($catalog.data)
+        if ($catalog.error -or $models.Count -eq 0 -or @($models | Where-Object { $_.id -isnot [string] -or [string]::IsNullOrWhiteSpace($_.id) }).Count) { throw 'Invalid model catalogue' }
+        if ([string]::IsNullOrWhiteSpace($LlamaCppModel)) { $LlamaCppModel = $models[0].id }
+        if ($LlamaCppModel -cnotin @($models | ForEach-Object { $_.id })) { throw 'Model not advertised' }
+        $script:ResolvedLlamaCppModel = $LlamaCppModel
+    } catch { throw '-- llama.cpp model discovery failed. Check endpoint, advertised model ID and authentication.' }
+    $GlobalState | Add-Member -NotePropertyName LlamaCppModel -NotePropertyValue $script:ResolvedLlamaCppModel -Force
+    $GlobalState | Add-Member -NotePropertyName LlamaCppTimeoutSec -NotePropertyValue $LlamaCppTimeoutSec -Force
+    Write-Information "++ llama.cpp model: $($script:ResolvedLlamaCppModel)" -InformationAction Continue
+}
+#endregion llama.cpp
 
 #region LMStudio
 if ($GlobalState.LLMProvider -eq 'LMStudio') {
@@ -3276,6 +3460,7 @@ $($($GlobalState.userInput).trim())
     Save-AndUpdateCode -response $PythonDeveloperResponce -GlobalState $GlobalState
     #endregion PM-pydev
 
+    if (-not $GlobalState.ReducedWorkflow) {
     #region RA-pydev
     $workflowStage = "Analyst/Developer"
     #Invoke-ProcessFeedbackAndResponse -role $requirementsAnalyst -description $GlobalState.userInput -code $lastpydevCode -tipAmount 100 -globalResponse ([ref]$GlobalpydevResponse) -lastCode ([ref]$lastpydevCode) -fileVersion ([ref]$FileVersion) -teamDiscussionDataFolder $GlobalState.TeamDiscussionDataFolder
@@ -3348,6 +3533,7 @@ $($($GlobalState.userInput).trim())
         Add-ToGlobalResponses $GlobalState $projectManagerResponse
     }
     #endregion PM Project report
+    }
     $GlobalState.WorkflowOutcome = 'Completed'
     $GlobalState.FailedStage = ''
     $GlobalState.WorkflowErrorCode = ''
@@ -3359,6 +3545,7 @@ $($($GlobalState.userInput).trim())
     }
 }
 #region Menu
+if (-not $NOInteraction) {
 
 # Define the menu prompt message
 $MenuPrompt = "{0} The previous version of the code has been shared below after the feedback block.`n`n````````text`n{1}`n`````````n`nHere is previous version of the code:`n`n``````python`n{2}`n```````n`nThink step by step. Make sure your answer is unbiased."
@@ -3628,6 +3815,7 @@ do {
         }
     }
 } while ($userOption -ne 'Q') # End the loop when the user chooses to quit
+}
 #endregion Menu
 
 #region Final code
