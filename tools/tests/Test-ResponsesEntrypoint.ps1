@@ -1,4 +1,4 @@
-param([string]$RepositoryRoot,[string]$EvidenceRoot,[switch]$Resume,[switch]$RetainedResponse,[switch]$DefaultAzure,[ValidateSet('Responses','ChatCompletions','Legacy')][string]$RecoveryProtocol='Responses',[switch]$PartialRecovery,[switch]$NOInteraction,[switch]$ReducedWorkflow,[int]$FailAt=0,[switch]$RejectDeveloper,[switch]$SavedReduced,[switch]$OmitSkipFlags,[switch]$PipelineScalar,[switch]$ConfiguredRAG,[switch]$LMStudio,[switch]$WithKey,[string]$ActualRecovery,[switch]$LateRejected,[switch]$FailedSave,[switch]$SearchFailure,[switch]$SearchFallback)
+param([string]$RepositoryRoot,[string]$EvidenceRoot,[switch]$Resume,[switch]$RetainedResponse,[switch]$DefaultAzure,[ValidateSet('Responses','ChatCompletions','Legacy')][string]$RecoveryProtocol='Responses',[switch]$PartialRecovery,[switch]$NOInteraction,[switch]$ReducedWorkflow,[int]$FailAt=0,[switch]$RejectDeveloper,[switch]$SavedReduced,[switch]$OmitSkipFlags,[switch]$PipelineScalar,[switch]$ConfiguredRAG,[switch]$LMStudio,[switch]$WithKey,[string]$ActualRecovery,[switch]$LateRejected,[switch]$FailedSave,[switch]$SearchFailure,[switch]$SearchFallback,[string]$DescriptionCase,[switch]$MinimalOutput)
 $ErrorActionPreference='Stop'
 New-Item -ItemType Directory -Force $EvidenceRoot|Out-Null
 $modules=Join-Path $EvidenceRoot 'modules'
@@ -31,10 +31,23 @@ if($FailedSave){
  }
 }
 function global:Find-Script {param($Name,$ErrorAction) @{Version='0.0.3'}}
+$global:descriptionReads=0;$global:descriptionAccepted=$false
+$descriptionOriginal="  Synthetic original task`t "
+$descriptionQueue=New-Object Collections.Queue
+if($DescriptionCase){foreach($value in @($null,'','   ',$descriptionOriginal)){$descriptionQueue.Enqueue($value)}}
 $global:reads=0
-function global:Read-Host {param($Prompt) $global:reads++;if($NOInteraction){throw 'Unexpected interactive input'};'Q'}
+function global:Read-Host {param($Prompt) $global:reads++;if($NOInteraction){throw 'Unexpected interactive input'}
+ if($DescriptionCase -and $Prompt -eq 'Please enter the Python project description'){
+  if($global:posts -or $global:gets -or $global:webs){throw 'Transport before valid description'}
+  if(-not $Resume -and @(Get-ChildItem $EvidenceRoot -Filter Project.xml -Recurse).Count){throw 'Project saved before valid description'}
+  if($descriptionQueue.Count -eq 0){throw 'Description queue exhausted'}
+  $global:descriptionReads++;$value=$descriptionQueue.Dequeue()
+  if(-not [string]::IsNullOrWhiteSpace($value)){$global:descriptionAccepted=$true}
+  return $value
+ };'Q'}
 function global:Invoke-WebRequest {param($Uri) if($ConfiguredRAG -and $Uri -eq 'https://article.fixture.invalid/'){ $global:webs++;return @{Content='<p>Synthetic article</p>'}};throw 'Unexpected transport'}
 function global:Invoke-RestMethod {param($Uri,$Headers,$Method,$Body,$TimeoutSec,$ErrorAction,$ContentType)
+ if($DescriptionCase -and $DescriptionCase -notlike 'recovery*' -and -not $global:descriptionAccepted){throw 'Transport before valid description'}
  if($Resume){throw 'Recovery HTTP forbidden'}
  if($LMStudio){
   $auth=if($WithKey){'Bearer synthetic-local'}else{'Bearer lm-studio'}
@@ -51,6 +64,7 @@ function global:Invoke-RestMethod {param($Uri,$Headers,$Method,$Body,$TimeoutSec
  if($ConfiguredRAG -and $Uri -eq 'https://api.exa.ai/search'){if($Headers.Authorization -ne 'Bearer synthetic-exa'){throw 'EXA auth mismatch'};$global:gets++;return @{results=@(@{url='https://article.fixture.invalid/'})}}
  if($Uri -ne 'https://fixture.invalid/openai/v1/responses' -or $Method -ne 'POST' -or $Headers['api-key'] -ne 'synthetic-key'){throw 'Unexpected Responses transport'}
  $b=$Body|ConvertFrom-Json
+ if($DescriptionCase -and $global:posts -eq 0 -and $b.input.IndexOf($descriptionOriginal,[StringComparison]::Ordinal) -lt 0){throw 'Original description missing from initial request'}
  if($b.max_output_tokens -ne 256 -or $TimeoutSec -ne 60 -or $b.store -ne $false -or $b.stream -ne $false -or $b.model -ne 'opaque-alias'){throw 'Budget/payload mismatch'}
  $global:posts++
  if($FailAt -eq $global:posts){throw 'Synthetic stage failure'}
@@ -65,6 +79,7 @@ if($ActualRecovery){
 }elseif($Resume){
  $folder=Join-Path $EvidenceRoot project;New-Item -ItemType Directory -Force $folder|Out-Null
  $state=[pscustomobject]@{TeamDiscussionDataFolder=$folder;GlobalResponse=@();FileVersion=1;LastpydevCode='x = 1';GlobalpydevResponse=@();OrgUserInput='synthetic';UserInput='synthetic';LogFolder=$EvidenceRoot;MaxTokens=256;VerbosePrompt=$false;NOTips=$true;NOLog=$false;NODocumentator=$true;NOPM=$true;RAG=$false;Stream=$false;LLMProvider='AzureOpenAI';AzureOpenAIProtocol='Responses';AzureResponsesTimeoutSec=60}
+ if($DescriptionCase -like 'recovery*'){$state.OrgUserInput='   ';$state.UserInput=''}
  if($PartialRecovery){$state|Add-Member WorkflowOutcome Partial;$state|Add-Member FailedStage 'Analyst/Developer';$state|Add-Member WorkflowErrorCode StageFailed}
  if($SavedReduced){$state|Add-Member ReducedWorkflow $true}
  $xml=Join-Path $folder Project.xml;$state|Export-Clixml $xml
@@ -74,16 +89,28 @@ if($ActualRecovery){
  $resumeArgs=@{}
  if($NOInteraction){$resumeArgs.NOInteraction=$true}
  if($ReducedWorkflow){$resumeArgs.ReducedWorkflow=$true}
- if($RecoveryProtocol -eq 'Responses'){& $entry -LoadProjectStatus $xml -DeploymentChat opaque-alias -AzureOpenAIProtocol ChatCompletions @resumeArgs}
+ if($DescriptionCase -eq 'recovery-nointeraction'){
+  $caught=$false
+  try{& $entry -LoadProjectStatus $xml -DeploymentChat opaque-alias -NOInteraction}catch{$caught=$true;$message=$_.Exception.Message}
+  if(-not $caught -or $message -ne 'NOInteraction requires nonblank saved project description.' -or $global:reads -or $global:posts -or $global:gets -or $global:webs){throw 'Blank recovery rejection mismatch'}
+  @{pass=$true;sourceHash=(Get-FileHash $entry).Hash;reads=$global:reads;posts=$global:posts;message=$message}|ConvertTo-Json|Set-Content (Join-Path $EvidenceRoot entrypoint.json)
+  exit 0
+ }elseif($RecoveryProtocol -eq 'Responses'){& $entry -LoadProjectStatus $xml -DeploymentChat opaque-alias -AzureOpenAIProtocol ChatCompletions @resumeArgs}
  else{& $entry -LoadProjectStatus $xml -DeploymentChat opaque-alias @resumeArgs}
 }else{
  $selection=if($DefaultAzure){@{}}else{@{LLMProvider='AzureOpenAI';AzureOpenAIProtocol='Responses';Stream=$false}}
+ if($MinimalOutput){$selection.MinimalOutput=$true}
  if($NOInteraction){$selection.NOInteraction=$true}
  if($ReducedWorkflow){$selection.ReducedWorkflow=$true}
  if(-not $OmitSkipFlags){$selection.NOPM=$true;$selection.NODocumentator=$true}
  if(-not $ConfiguredRAG){$selection.NORAG=$true}
  if($LMStudio){$selection.LLMProvider='LMStudio';$selection.Remove('AzureOpenAIProtocol')}
- if($PipelineScalar){'Synthetic offline draft'| & $entry -AzureResponsesTimeoutSec 60 -MaxTokens 256 -DeploymentChat opaque-alias -NOTips -LogFolder $EvidenceRoot @selection}
+ if($DescriptionCase){
+  $inputArgs=@{}
+  if($DescriptionCase -eq 'empty'){$inputArgs.UserInput=''}
+  if($DescriptionCase -eq 'whitespace'){$inputArgs.UserInput='   '}
+  & $entry @inputArgs -AzureResponsesTimeoutSec 60 -MaxTokens 256 -DeploymentChat opaque-alias -NOTips -LogFolder $EvidenceRoot @selection
+ }elseif($PipelineScalar){'Synthetic offline draft'| & $entry -AzureResponsesTimeoutSec 60 -MaxTokens 256 -DeploymentChat opaque-alias -NOTips -LogFolder $EvidenceRoot @selection}
  else{& $entry -UserInput 'Synthetic offline draft' -AzureResponsesTimeoutSec 60 -MaxTokens 256 -DeploymentChat opaque-alias -NOTips -LogFolder $EvidenceRoot @selection}
 }
 $after=Get-UserHash
@@ -98,6 +125,8 @@ if($FailedSave){
 $projects=if($ActualRecovery){@(Get-Item $ActualRecovery)}else{@(Get-ChildItem $EvidenceRoot -Filter Project.xml -Recurse)}
 if($projects.Count -ne 1){throw 'Project save missing'}
 $saved=Import-Clixml $projects[0].FullName
+if($DescriptionCase -eq 'recovery-nointeraction'){throw 'Blank recovery did not fail closed'}
+if($DescriptionCase -and ($global:descriptionReads -ne 4 -or -not $global:descriptionAccepted -or $saved.OrgUserInput -cne $descriptionOriginal)){throw 'Mandatory description retry/original preservation mismatch'}
 if($saved.PSObject.Properties['NOInteraction']){throw 'Invocation-only flag persisted'}
 if(-not $ActualRecovery -and $saved.ReducedWorkflow -ne [bool]($SavedReduced -or ($ReducedWorkflow -and -not $Resume))){throw 'ReducedWorkflow state/default mismatch'}
 $expectedProtocol=if($Resume -and $RecoveryProtocol -ne 'Responses'){'ChatCompletions'}else{'Responses'}

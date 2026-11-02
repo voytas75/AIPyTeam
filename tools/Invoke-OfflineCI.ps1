@@ -33,7 +33,7 @@ $suites = @(
     @{name='AzureResponses';parameter='SourcePath';count=16;receipt='receipt.json'},
     @{name='ResponsesHttpError';parameter='SourcePath';count=4;receipt='receipt.json'},
     @{name='PythonExportIntegrity';parameter='RepositoryRoot';count=11;receipt='receipt.json'},
-    @{name='WorkflowModes';parameter='RepositoryRoot';count=21;receipt='receipt.json'},
+    @{name='WorkflowModes';parameter='RepositoryRoot';count=28;receipt='receipt.json'},
     @{name='LlamaCpp';parameter='RepositoryRoot';count=39;receipt='receipt.json'},
     @{name='DependencyStartup';parameter='RepositoryRoot';count=4;receipt='receipt.json'},
     @{name='PromptContracts';parameter='RepositoryRoot';count=12;receipt='receipt.json'},

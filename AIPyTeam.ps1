@@ -2640,6 +2640,9 @@ if ($NOInteraction) {
         }
         $preflightState = Get-ProjectState -FilePath $LoadProjectStatus
         if (-not $preflightState) { throw 'Project state could not be loaded.' }
+        if ([string]::IsNullOrWhiteSpace($preflightState.OrgUserInput) -and [string]::IsNullOrWhiteSpace($preflightState.UserInput)) {
+            throw 'NOInteraction requires nonblank saved project description.'
+        }
         $preflightProvider = $preflightState.LLMProvider
         $preflightRAG = $preflightState.RAG
     }
@@ -2713,14 +2716,13 @@ if (-not $LoadProjectStatus) {
     $GlobalState.LogFolder = $LogFolder
 }
 
-# Check if the UserInput parameter is not provided
-if (-not $UserInput) {
-    if (-not $LoadProjectStatus) {
-        # Prompt the user to enter the Python project description
+# A fresh task must be nonblank before folders, discovery or workflow dispatch.
+if (-not $LoadProjectStatus) {
+    while ([string]::IsNullOrWhiteSpace($UserInput)) {
+        Write-Information '++ Project description is required. Enter a nonblank description.' -InformationAction Continue
         $UserInput = Read-Host "Please enter the Python project description"
-        # Store the user input in the GlobalState object
-        $GlobalState.UserInput = $UserInput
     }
+    $GlobalState.UserInput = $UserInput
 }
 
 if (-not $script:MinimalOutput) { Show-Banner }
@@ -2747,6 +2749,16 @@ if ($LoadProjectStatus) {
         # Load the project state from the specified file
         $GlobalState = Get-ProjectState -FilePath $LoadProjectStatus
         if (-not $GlobalState) { throw "Project state could not be loaded." }
+        # Preserve saved-task precedence; repair only states without any description.
+        if ([string]::IsNullOrWhiteSpace($GlobalState.OrgUserInput) -and [string]::IsNullOrWhiteSpace($GlobalState.UserInput)) {
+            $description = $null
+            while ([string]::IsNullOrWhiteSpace($description)) {
+                Write-Information '++ Project description is required. Enter a nonblank description.' -InformationAction Continue
+                $description = Read-Host "Please enter the Python project description"
+            }
+            $GlobalState | Add-Member -NotePropertyName OrgUserInput -NotePropertyValue $description -Force
+            $GlobalState | Add-Member -NotePropertyName UserInput -NotePropertyValue $description -Force
+        }
         Write-Information $(if ($script:MinimalOutput) { "++ Project state loaded from: $LoadProjectStatus" } else { "++ Project state loaded successfully from $LoadProjectStatus" }) -InformationAction Continue
         # Output verbose information about the loaded project state
         if (-not $script:MinimalOutput) {
