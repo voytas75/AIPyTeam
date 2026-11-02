@@ -75,5 +75,29 @@ foreach($mode in 'page-error','blank-page') {
  $texts += [IO.File]::ReadAllText($log)
  Assert ('entry '+$mode+' artifacts sanitized') ($texts -notmatch 'private-page-error-marker|synthetic-search|synthetic-key')
 }
+# Successful initial RAG and draft, then page challenge during Analyst feedback.
+foreach($display in 'normal','minimal') {
+ $out=Join-Path $EvidenceRoot ('second-page-'+$display)
+ $helper=[IO.File]::ReadAllText((Join-Path $RepositoryRoot 'tools/tests/Test-ResponsesEntrypoint.ps1')).Replace("`r`n","`n")
+ $anchor='$global:webs++;return @{Content=''<p>Synthetic article</p>''}'
+ if(-not $helper.Contains($anchor)){throw 'Second page injection anchor missing'}
+ $helper=$helper.Replace($anchor,'$global:webs++;if($global:webs -eq 2){throw ''<html>Just a moment Enable JavaScript challenge-platform PRIVATE_PAGE_TOKEN</html>''};return @{Content=''<p>Synthetic article</p>''}')
+ $helper=$helper.Replace('if($PartialRecovery -or $ActualRecovery -or $LateRejected -or ($FailAt -gt 2))','if($ConfiguredRAG -or $PartialRecovery -or $ActualRecovery -or $LateRejected -or ($FailAt -gt 2))')
+ $helper=$helper.Replace('elseif($ConfiguredRAG){5}','elseif($ConfiguredRAG){6}')
+ $fixture=Join-Path $EvidenceRoot ('second-page-'+$display+'.ps1');[IO.File]::WriteAllText($fixture,$helper,(New-Object Text.UTF8Encoding($true)))
+ $log=Join-Path $EvidenceRoot ('second-page-'+$display+'.log')
+ $args=@('-ConfiguredRAG');if($display -eq 'minimal'){$args+='-MinimalOutput'}
+ & $native -NoProfile -NonInteractive -File $fixture -RepositoryRoot $RepositoryRoot -EvidenceRoot $out @args *> $log
+ Assert ('second page original entry '+$display) ($LASTEXITCODE -eq 0)
+ $record=Get-Content (Join-Path $out entrypoint.json) -Raw|ConvertFrom-Json
+ $saved=Import-Clixml $record.project
+ $draft=Join-Path $saved.TeamDiscussionDataFolder TheCode_v1.py
+ Assert ('second page Partial draft preserved '+$display) ($record.posts -eq 6 -and $record.gets -eq 2 -and $record.webs -eq 2 -and $record.reads -eq 1 -and $record.UserEnvironmentUnchanged -and $record.originalEntry -eq $source -and $saved.WorkflowOutcome -eq 'Partial' -and $saved.FailedStage -eq 'Analyst/Developer' -and $saved.WorkflowErrorCode -eq 'StageFailed' -and $saved.FileVersion -eq 2 -and (Test-Path $draft) -and [IO.File]::ReadAllText($draft).Trim() -eq $saved.LastpydevCode.Trim() -and -not (Test-Path (Join-Path $saved.TeamDiscussionDataFolder TheCode_v2.py)))
+ $text=[IO.File]::ReadAllText($log)
+ Assert ('second page required notifications '+$display) ($text.Contains('-- Error: RAG page extraction failed.') -and $text.Contains('Workflow Partial; stopped at Analyst/Developer.') -and $text.Contains('-- Error details have been saved to the file:') -and (Test-Path (Join-Path $saved.TeamDiscussionDataFolder ERROR.txt)))
+ $hasHelp=$text.Contains('-- Context:') -and $text.Contains('-- Suggestions:')
+ Assert ('second page help policy '+$display) $(if($display -eq 'minimal'){-not $text.Contains('-- Context:') -and -not $text.Contains('-- Suggestions:')}else{$hasHelp})
+ Assert ('second page safe owned output '+$display) ($text -notmatch 'PRIVATE_PAGE_TOKEN|<html>|challenge-platform' -and [IO.File]::ReadAllText((Join-Path $saved.TeamDiscussionDataFolder ERROR.txt)) -notmatch 'PRIVATE_PAGE_TOKEN|<html>|challenge-platform')
+}
 @{sourceHash=(Get-FileHash $source).Hash;parseErrors=$e.Count;cases=@($cases.ToArray());scope='Source-bound offline HTTP mocks; no live API calls'}|ConvertTo-Json -Depth 5|Set-Content (Join-Path $EvidenceRoot receipt.json) -Encoding UTF8
 Write-Host "RAG providers passed: $($cases.Count)"

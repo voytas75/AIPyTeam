@@ -1250,8 +1250,10 @@ function Update-ErrorHandling {
     } | ConvertTo-Json
 
     # Display the error details and suggestions
-    Write-Host "-- Context: $ErrorContext" -ForegroundColor Yellow
-    Write-Host "-- Suggestions: $suggestions" -ForegroundColor Yellow
+    if (-not $script:MinimalOutput) {
+        Write-Host "-- Context: $ErrorContext" -ForegroundColor Yellow
+        Write-Host "-- Suggestions: $suggestions" -ForegroundColor Yellow
+    }
     Write-Host "-- Error: $($ErrorRecord.Exception.Message)" -ForegroundColor Yellow
 
     # Log the error details if LogFilePath is provided

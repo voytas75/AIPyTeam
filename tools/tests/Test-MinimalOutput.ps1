@@ -94,6 +94,19 @@ try {
 $ok=$ok -and [IO.File]::ReadAllText($target) -eq 'sentinel'
 $rows+=@{name='locked-export';pass=[bool]$ok;exitCode=0}
 
+# Real locked existing error log must not produce a saved confirmation.
+$errorLog=Join-Path $EvidenceRoot locked-error.txt;[IO.File]::WriteAllText($errorLog,'error-sentinel')
+$lock=[IO.File]::Open($errorLog,[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+try {
+ $captured=New-Object Collections.Generic.List[object]
+ $oldPreference=$ErrorActionPreference;$ErrorActionPreference='Continue'
+ try { throw 'Synthetic safe error' } catch { $safeError=$_ }
+ try { Update-ErrorHandling -ErrorRecord $safeError -ErrorContext 'LockedLog' -LogFilePath $errorLog 6>&1 2>&1 | ForEach-Object {$captured.Add($_)} } catch {}
+ $ErrorActionPreference=$oldPreference
+ $notice=$captured|Out-String
+} finally {$lock.Dispose()}
+$rows+=@{name='locked-error-log-no-false-save';pass=[bool](-not $notice.Contains('Error details have been saved') -and $notice.Contains('-- Error: Synthetic safe error') -and [IO.File]::ReadAllText($errorLog) -eq 'error-sentinel');exitCode=0}
+
 # Conflicting saved/CLI values through the original filepath in fresh children.
 foreach($display in 'normal','minimal') {
  foreach($provider in 'azure','llama') {
