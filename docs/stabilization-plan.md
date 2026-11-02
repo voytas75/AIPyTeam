@@ -1,6 +1,11 @@
 # Bounded stabilization checkpoint
 
-## Active checkpoint: approved llama.cpp (local candidate)
+## Active checkpoint: approved dependency startup correction (local candidate)
+- Clean master baseline `e0b3142be3f8a40e3c5e5f3c1d2215d9bb911ed1`; source `ac7412dea65b929ca2d16091e5b67aeee65e21cf31a800c2c122ced72d53dcc2`. Minimal non-forced minimum-version import and removal of the late banner-setting override; global requirements/version validation preserved.
+- Native Windows PowerShell 5.1/7 RED demonstrates two fixture initializations on fresh/eligible-loaded original startup; GREEN reuses eligible imports and loads 0.7.0 when 0.3.1 is already loaded. Only-old stops before input/transport. Each final offline matrix passes 9 suites / 128 cases (existing 8 / 124 plus startup 4). Source SHA256 `b7dd77bcea19a8b0bc46f43574ef5631ad9f26c00edfc555ee2c3582b1b895bd`.
+- Evidence: `/home/voytas/.hermes/cache/scratch/aipyteam-stabilization/dependency-startup/REPORT.md`. Owned dependency fixtures, not real-module bootstrap or fresh live acceptance. No installs, User environment/security changes, version bump, commit/push, owner sync or package rebuild. Prior handoff/source bindings remain historical and invalid for these bytes.
+
+## Previous checkpoint: approved llama.cpp (local candidate)
 - Bounded dedicated provider completion only; prior NOInteraction/ReducedWorkflow and documentation restructuring preserved. Current source SHA256 `ac7412dea65b929ca2d16091e5b67aeee65e21cf31a800c2c122ced72d53dcc2` supersedes prior `1436ddefe336980fba5980305ffbb67c43a431f848dbb8f44ee73bcc06fce04d`. Local uncommitted/pending delivery; previous handoff invalid for new bytes, retained historical archive unchanged.
 - Native Windows PowerShell 5.1/7 final Invoke-OfflineCI receipts each pass 8 suites / 124 cases, including 39 dedicated llama.cpp cases. Buffered SSE is not live streaming display. Model discovery, optional Bearer headers, JSON/SSE failures, fail-stop, 2/10 POST successful paths and GET-only recovery qualified with owned fixtures, not a real server or TLS.
 - Readback/hash/AST inventories and scope reconciliation: `/home/voytas/.hermes/cache/scratch/aipyteam-stabilization/llama-cpp/REPORT.md` and `closeout.json`. No new features, source/test changes in documentation closeout, version bump, install, security/environment writes, live call, commit/push, owner sync, package rebuild or publication. Remote CI still reflects its historical source/64 cases; local helper additions are not remotely activated.

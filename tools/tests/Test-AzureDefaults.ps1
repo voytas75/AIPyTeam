@@ -11,7 +11,7 @@ $functions=($ast.FindAll({param($n)$n -is [Management.Automation.Language.Functi
 $start=$s.IndexOf('#region Setting Up');$end=$s.IndexOf('#region ollama',$start)
 $guard=@'
 function Test-ModuleMinVersion {param($ModuleName,$MinimumVersion) $true}
-function Import-Module {param($Name,[switch]$Force)}
+function Import-Module {param($Name,$MinimumVersion,$ErrorAction)}
 function Show-Banner {}
 function Update-ErrorHandling {param($ErrorRecord,$ErrorContext,$LogFilePath) throw $ErrorRecord}
 '@

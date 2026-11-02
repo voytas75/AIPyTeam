@@ -8,6 +8,7 @@ AIPyTeam is a PowerShell-driven Python draft generator. It simulates a team of a
 
 - Native Windows PowerShell 5.1 or PowerShell 7.
 - `PSAOAI` >= 0.3.2 and `PowerHTML`, required globally even with `-NORAG` or `-ReducedWorkflow`. Controlled qualification used PSAOAI 0.7.0 / PowerHTML 0.2.0.
+- Startup reuses an eligible loaded PSAOAI without forced reinitialization; see [startup banners](docs/troubleshooting.md#duplicate-psaoai-startup-banner).
 - A working backend configured before launch; see [provider configuration](docs/provider-configuration.md).
 - Python is not a generator dependency. PSScriptAnalyzer does not validate Python and is not required.
 

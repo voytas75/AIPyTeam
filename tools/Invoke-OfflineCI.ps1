@@ -34,7 +34,8 @@ $suites = @(
     @{name='ResponsesHttpError';parameter='SourcePath';count=4;receipt='receipt.json'},
     @{name='PythonExportIntegrity';parameter='RepositoryRoot';count=11;receipt='receipt.json'},
     @{name='WorkflowModes';parameter='RepositoryRoot';count=21;receipt='receipt.json'},
-    @{name='LlamaCpp';parameter='RepositoryRoot';count=39;receipt='receipt.json'}
+    @{name='LlamaCpp';parameter='RepositoryRoot';count=39;receipt='receipt.json'},
+    @{name='DependencyStartup';parameter='RepositoryRoot';count=4;receipt='receipt.json'}
 )
 # Fresh native process per suite. Never inspect inherited credential values.
 $wrapper = Join-Path $EvidenceRoot 'child.ps1'
@@ -85,7 +86,7 @@ if (-not $failed) {
     }
 }
 if ((Get-FileHash $source).Hash -ne $sourceHash) { $failed=$true }
-@{runtime=$PSVersionTable.PSVersion.ToString();native=$native;sourceHash=$sourceHash;sourceUnchanged=((Get-FileHash $source).Hash -eq $sourceHash);pass=(-not $failed);suites=@($rows.ToArray());scope='Seven existing suites plus dedicated llama.cpp source-bound and original-entry offline qualification; no real provider requests'} |
+@{runtime=$PSVersionTable.PSVersion.ToString();native=$native;sourceHash=$sourceHash;sourceUnchanged=((Get-FileHash $source).Hash -eq $sourceHash);pass=(-not $failed);suites=@($rows.ToArray());scope='Eight existing suites plus native owned-module dependency startup regression; no real provider requests'} |
     ConvertTo-Json -Depth 6 | Set-Content (Join-Path $artifacts 'summary.json') -Encoding UTF8
 if ($failed) { exit 1 }
 Write-Host ('Offline CI passed: {0} suites, {1} cases.' -f $rows.Count, ($rows | ForEach-Object { $_.actual } | Measure-Object -Sum).Sum)

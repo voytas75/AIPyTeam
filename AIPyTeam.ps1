@@ -2695,8 +2695,8 @@ if ($NOInteraction) {
 
 # Check if the PSAOAI module version is at least 0.3.2
 if ( Test-ModuleMinVersion -ModuleName PSAOAI -MinimumVersion "0.3.2" ) {
-    # Import the PSAOAI module forcefully
-    [void](Import-module -name PSAOAI -Force)
+    # Reuse an eligible #Requires import; load a qualifying version if only an old one is loaded.
+    [void](Import-Module -Name PSAOAI -MinimumVersion "0.3.2" -ErrorAction Stop)
 }
 else {
     # Display a warning message if the required module version is not installed
@@ -2741,9 +2741,6 @@ if (-not $LoadProjectStatus) {
     }
     $GlobalState.LogFolder = $LogFolder
 }
-
-# Disabe PSAOAI importing banner
-$env:PSAOAI_BANNER = "0"
 
 # Check if the UserInput parameter is not provided
 if (-not $UserInput) {

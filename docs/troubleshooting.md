@@ -8,6 +8,12 @@ Run `.\AIPyTeam.ps1` from the checkout directory. A Gallery installation is a di
 
 PSAOAI >=0.3.2 and PowerHTML are globally required. Install missing modules explicitly using the [README instructions](../README.md#requirements); do not change repository trust or execution policy to hide a dependency error. For filesystem permission failures, choose a writable LogFolder rather than routinely running as administrator. Startup/update checks and dependency resolution can contact Gallery; offline fixture tests do not prove arbitrary dependency bootstrap is offline.
 
+## Duplicate PSAOAI startup banner
+
+PowerShell `#Requires -Modules PSAOAI` imports the dependency before AIPyTeam executes. The former explicit `Import-Module -Force` initialized it again, producing two startup banners before the input prompt. Startup now uses `Import-Module -MinimumVersion 0.3.2` without Force: an eligible loaded module is reused; an older loaded version requires an installed qualifying version. If only an old version is available, startup stops before input or inference. Global PSAOAI and PowerHTML requirements remain unchanged.
+
+This is an import correction, not banner suppression. A fresh dependency import can still print one banner; an already-loaded eligible module need not print another. AIPyTeam no longer overrides the Process PSAOAI_BANNER setting. Owned-module native tests verify import counts, not the real module bootstrap or its external diagnostics.
+
 ## NOInteraction stops before inference
 
 Fresh input must be nonblank. Azure needs Process endpoint/key and deployment; LMStudio needs Process OPENAI_API_BASE even though interactive startup has a localhost default. Enabled RAG needs both Process Bing settings. Recovery needs an explicit XML file or a directory with exactly one XML file, and uses the saved active provider/RAG. Do not disable the fail-closed checks or insert literal credentials. See [provider setup](provider-configuration.md) and [RAG scopes](rag.md).
