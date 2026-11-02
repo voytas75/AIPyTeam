@@ -1,7 +1,7 @@
 param([string]$RepositoryRoot,[string]$EvidenceRoot)
 $ErrorActionPreference='Stop'
 New-Item -ItemType Directory -Force $EvidenceRoot|Out-Null
-$base=[IO.File]::ReadAllText((Join-Path $RepositoryRoot 'tools/tests/Test-ResponsesEntrypoint.ps1'))
+$base=[IO.File]::ReadAllText((Join-Path $RepositoryRoot 'tools/tests/Test-ResponsesEntrypoint.ps1')).Replace("`r`n","`n")
 $rows=@();$native=(Get-Process -Id $PID).Path
 foreach($mode in 'reduced','full','reports','menu','rag','ragfull') {
  $out=Join-Path $EvidenceRoot $mode;New-Item -ItemType Directory -Force $out|Out-Null
