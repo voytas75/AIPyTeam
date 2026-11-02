@@ -1,4 +1,4 @@
-<#PSScriptInfo
+﻿<#PSScriptInfo
 .VERSION 0.0.3
 .GUID 2473f758-a87e-4f85-9e61-0331c3e88767
 .AUTHOR voytas75
@@ -118,7 +118,13 @@ param(
 
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the LLM provider to use (e.g., OpenAI, AzureOpenAI).")]
     [ValidateSet("AzureOpenAI", "ollama", "LMStudio", "OpenAI" )]
-    [string]$LLMProvider = "AzureOpenAI"
+    [string]$LLMProvider = "AzureOpenAI",
+
+    [ValidateSet('ChatCompletions', 'Responses')]
+    [string]$AzureOpenAIProtocol = 'ChatCompletions',
+
+    [ValidateRange(1, 2147483647)]
+    [int]$AzureResponsesTimeoutSec = 60
 )
 $AIPyTeamVersion = "0.0.3"
 
@@ -770,20 +776,44 @@ function Export-AndWritePythonCodeBlocks {
         [string]$StartDelimiter,
         [string]$EndDelimiter
     )
-    # Define the regular expression pattern to match Python code blocks
-    
+    # Read headings only outside fences; retain every production/helper block.
     $pattern = '(?si)' + [regex]::Escape($StartDelimiter) + '(.*?)' + [regex]::Escape($EndDelimiter)
+    $outsideFences = [regex]::Replace($InputString, '(?s)```.*?```', { param($m) [regex]::Replace($m.Value, '[^\r\n]', ' ') })
+    $headingPrefix = '(?im)^[ \t]*(?:#{1,6}[ \t]*)?(?:\d+[.)][ \t]*)?(?:\*\*)?'
+    $codeHeadings = [regex]::Matches($outsideFences, $headingPrefix + '(?:Python[ \t]+)?Code(?:\*\*)?[ \t]*:?[ \t]*$')
+    if ($codeHeadings.Count -gt 1) { return $false }
+    $codeHeading = [regex]::Match($outsideFences, $headingPrefix + '(?:Python[ \t]+)?Code(?:\*\*)?[ \t]*:?[ \t]*$')
+    if ($codeHeading.Success) {
+        $sectionStart = $codeHeading.Index + $codeHeading.Length
+        $sectionOutside = $outsideFences.Substring($sectionStart)
+        $usageHeading = [regex]::Match($sectionOutside, $headingPrefix + '(?:Code[ \t]+)?Usage(?:[ \t]+Example)?[ \t]*:?(?:\*\*)?[ \t]*:?[ \t]*$')
+        $sectionLength = if ($usageHeading.Success) { $usageHeading.Index } else { $sectionOutside.Length }
+        $InputString = $InputString.Substring($sectionStart, $sectionLength)
+        $sectionOutside = $sectionOutside.Substring(0, $sectionLength)
+        # Only the explicit development-only heading is an exclusion boundary.
+        # Generic test labels are ambiguous, not permission to discard Python.
+        $testHeadings = [regex]::Matches($sectionOutside, $headingPrefix + 'Development-only[ \t]+(?:acceptance[ \t]+)?tests(?:\*\*)?[ \t]*:?[ \t]*$')
+        $testLabels = [regex]::Matches($sectionOutside, '(?im)^[ \t]*(?:#{1,6}[ \t]+|\d+[.)][ \t]+|\*\*)[^\r\n]*\btests?\b[^\r\n]*$')
+        if ($testHeadings.Count -gt 1 -or $testLabels.Count -ne $testHeadings.Count) { return $false }
+        if ($testHeadings.Count -eq 1) {
+            $boundary = $testHeadings[0].Index
+            $testTail = $sectionOutside.Substring($boundary + $testHeadings[0].Length)
+            if ($testTail -match '(?im)^[ \t]*(?:#{1,6}[ \t]+|\d+[.)][ \t]+|\*\*)[^\r\n]*\b(?:production|helper|code)\b') { return $false }
+            $InputString = $InputString.Substring(0, $boundary)
+        }
+    }
     $codeBlock_ = ""
     try {
         # Process the entire input string at once
         if ($InputString -match $pattern) {
             $matches_ = [regex]::Matches($InputString, $pattern)
+            if (-not $codeHeading.Success -and $matches_.Count -gt 1) { return $false }
             foreach ($match in $matches_) {
                 $codeBlock = $match.Groups[1].Value.Trim()
-                $codeBlock_ += "# exported $(get-date)`n $codeBlock`n`n"
+                $codeBlock_ += "$codeBlock`n`n"
             }
             if ($OutputFilePath) {
-                $codeBlock_ | Out-File -FilePath $OutputFilePath -Append -Encoding UTF8
+                $codeBlock_ | Out-File -FilePath $OutputFilePath -Encoding UTF8 -ErrorAction Stop
                 if (Test-path $OutputFilePath) {
                     Write-Information "++ Code block exported and written to file: $OutputFilePath" -InformationAction Continue
                     return $OutputFilePath
@@ -962,9 +992,9 @@ Please format your response as follows:
 1. Script Purpose: (Brief description of what the script does)
 2. Input Parameters: (List of input parameters, if any)
 3. Output: (Description of what the script returns or produces)
-4. Python code: (The actual code, properly formatted and commented)
+4. Python code: (Production code only, properly formatted and commented. Include all production helpers in this single-file export; no imports of unpublished local files. Do not include development tests in section 4.)
 5. Usage Example: (A brief example of how to use the script)
-6. Self-Review Notes: (Any observations or potential improvements you've identified)
+6. Self-Review Notes: (Any observations or potential improvements you've identified; place any optional development-only acceptance tests here, outside section 4.)
 
 $($Reviewer.Name) Guidelines: 
 ````````text
@@ -1090,12 +1120,14 @@ function Save-ProjectState {
     )
     try {
         # Export the project state to a file in XML format
-        $GlobalState | Export-Clixml -Path $FilePath
+        $GlobalState | Export-Clixml -Path $FilePath -ErrorAction Stop
+        return $true
     }    
     catch [System.Exception] {
         # Handle any exceptions that occur during the save process
         $functionName = $MyInvocation.MyCommand.Name
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
+        return $false
     }
 }
 
@@ -1107,9 +1139,9 @@ function Get-ProjectState {
         # Check if the specified file path exists
         if (Test-Path -Path $FilePath) {
             # Import the project state from the XML file
-            $projectState = Import-Clixml -Path $FilePath
+            $projectState = Import-Clixml -Path $FilePath -ErrorAction Stop
             if ($null -eq $projectState.LLMProvider) {
-                $projectState.LLMProvider = "AzureOpenAI"
+                $projectState | Add-Member -NotePropertyName LLMProvider -NotePropertyValue "AzureOpenAI" -Force
             }
             # Return the updated GlobalState object
             return $projectState
@@ -1190,6 +1222,111 @@ function Update-ErrorHandling {
     }        
 }
 
+function Resolve-AIPyTeamAzureProtocol {
+    param($State, [ValidateSet('ChatCompletions', 'Responses')][string]$Protocol = 'ChatCompletions')
+    if ($State.PSObject.Properties.Name -contains 'AzureOpenAIProtocol') {
+        $Protocol = $State.AzureOpenAIProtocol
+    }
+    if ($Protocol -notin @('ChatCompletions', 'Responses')) { throw 'Invalid saved Azure protocol.' }
+    $State | Add-Member -NotePropertyName AzureOpenAIProtocol -NotePropertyValue $Protocol -Force
+    return $Protocol
+}
+
+function New-AIPyTeamResponsesRequest {
+    param([string]$Endpoint, [string]$ApiKey, [string]$Deployment,
+        [string]$SystemPrompt, [string]$UserPrompt,
+        [ValidateRange(1, 2147483647)][int]$MaxTokens = 20480,
+        [ValidateRange(1, 2147483647)][int]$TimeOut = 60, [bool]$Stream = $false)
+    if ($Stream) { throw 'Azure Responses streaming is unsupported; select -Stream $false.' }
+    # Reuse PSAOAI/AIPSTeam's existing Windows DPAPI credential contract.
+    if ($ApiKey -match '^01000000d08c9ddf') {
+        try {
+            $secureKey = ConvertTo-SecureString -String $ApiKey -ErrorAction Stop
+            $ApiKey = ([pscredential]::new('Azure', $secureKey)).GetNetworkCredential().Password
+        } catch { throw 'Azure Responses credential decode failed.' }
+        finally { if ($secureKey) { $secureKey.Dispose() } }
+    }
+    if ($ApiKey -match '[\r\n\x00]' -or $ApiKey -eq '***') { throw 'Azure Responses credential format invalid.' }
+    if ([string]::IsNullOrWhiteSpace($ApiKey) -or [string]::IsNullOrWhiteSpace($Deployment)) { throw 'Azure Responses requires Process key and deployment.' }
+    $uri = $null
+    if (-not [Uri]::TryCreate($Endpoint, [UriKind]::Absolute, [ref]$uri) -or $uri.Scheme -ne 'https' -or $uri.UserInfo -or $uri.Query -or $uri.Fragment) { throw 'Invalid Azure Responses HTTPS endpoint.' }
+    $path = $uri.AbsolutePath.TrimEnd('/')
+    if ($path -notin @('', '/openai/v1')) { throw 'Azure Responses endpoint must be resource root or /openai/v1.' }
+    [pscustomobject]@{
+        Uri = $uri.GetLeftPart([UriPartial]::Authority) + '/openai/v1/responses'
+        Headers = @{ 'api-key' = $ApiKey }
+        TimeoutSec = $TimeOut
+        Body = (@{ model = $Deployment; instructions = $SystemPrompt; input = $UserPrompt; max_output_tokens = $MaxTokens; store = $false; stream = $false } | ConvertTo-Json -Depth 10 -Compress)
+    }
+}
+
+function Read-AIPyTeamResponsesResponse {
+    param($Response)
+    if ($Response.error -or $Response.status -ne 'completed') { throw 'Azure Responses did not complete; inspect LastAzureResponsesMetadata.' }
+    $parts = @()
+    foreach ($item in $Response.output) {
+        if ($item.type -eq 'reasoning') { continue }
+        if ($item.type -ne 'message' -or $item.role -ne 'assistant') { throw 'Azure Responses tool/nonmessage output is unsupported.' }
+        foreach ($content in $item.content) {
+            if ($content.type -ne 'output_text') { throw 'Azure Responses refusal/nontext output is unsupported.' }
+            $parts += [string]$content.text
+        }
+    }
+    $text = $parts -join ''
+    if ([string]::IsNullOrWhiteSpace($text)) { throw 'Azure Responses completed without usable text.' }
+    return $text
+}
+
+function Get-AIPyTeamResponsesHttpError {
+    param([Management.Automation.ErrorRecord]$ErrorRecord)
+    $status = $null; $body = $null; $providerError = $null
+    try { if ($ErrorRecord.Exception.Response) { $status = [int]$ErrorRecord.Exception.Response.StatusCode } } catch {}
+    # PowerShell 7 generally exposes ErrorDetails; Windows PowerShell 5.1 may only expose the response stream.
+    if ($ErrorRecord.ErrorDetails) { $body = $ErrorRecord.ErrorDetails.Message }
+    if ([string]::IsNullOrWhiteSpace($body)) {
+        $reader = $null
+        try {
+            $stream = $ErrorRecord.Exception.Response.GetResponseStream()
+            if ($stream) {
+                $reader = [IO.StreamReader]::new($stream)
+                $buffer = New-Object char[] 16385
+                $count = $reader.ReadBlock($buffer, 0, $buffer.Length)
+                if ($count -le 16384) { $body = -join $buffer[0..($count - 1)] }
+            }
+        } catch {} finally { if ($reader) { $reader.Dispose() } }
+    }
+    if ($body -and $body.Length -le 16384) { try { $providerError = ($body | ConvertFrom-Json -ErrorAction Stop).error } catch {} }
+    $code = $null; $param = $null
+    # Never retain raw body/message: even a short provider message may echo credentials or prompt content.
+    if ($providerError.code -is [string] -and $providerError.code -cmatch '^[A-Za-z0-9_.-]{1,80}$') { $code = $providerError.code }
+    if ($providerError.param -is [string] -and $providerError.param -cmatch '^[A-Za-z0-9_.-]{1,80}$') { $param = $providerError.param }
+    foreach ($secret in @($env:PSAOAI_API_AZURE_OPENAI_KEY, $env:PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT)) {
+        if ($secret -and $code -eq $secret) { $code = $null }
+        if ($secret -and $param -eq $secret) { $param = $null }
+    }
+    [pscustomobject]@{ status = 'transport_error'; httpStatus = $status; errorCode = $code; errorParam = $param; errorMessage = 'Azure Responses HTTP/transport failure; provider message omitted for safety.'; usage = $null }
+}
+
+function Invoke-AIPyTeamAzureResponses {
+    param([string]$SystemPrompt, [string]$UserPrompt, [string]$Deployment,
+        [ValidateRange(1, 2147483647)][int]$MaxTokens = 20480,
+        [ValidateRange(1, 2147483647)][int]$TimeOut = 60, [bool]$Stream = $false)
+    $script:LastAzureResponsesMetadata = $null
+    $request = New-AIPyTeamResponsesRequest -Endpoint $env:PSAOAI_API_AZURE_OPENAI_ENDPOINT -ApiKey $env:PSAOAI_API_AZURE_OPENAI_KEY -Deployment $Deployment -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -MaxTokens $MaxTokens -TimeOut $TimeOut -Stream $Stream
+    try {
+        $response = Invoke-RestMethod -Uri $request.Uri -Method POST -Headers $request.Headers -Body $request.Body -ContentType 'application/json; charset=utf-8' -TimeoutSec $request.TimeoutSec -ErrorAction Stop
+    }
+    catch {
+        $script:LastAzureResponsesMetadata = Get-AIPyTeamResponsesHttpError -ErrorRecord $_
+        $m = $script:LastAzureResponsesMetadata
+        $safeException = [InvalidOperationException]::new("Azure Responses transport failed; HTTP=$($m.httpStatus); code=$($m.errorCode); param=$($m.errorParam); no retry or protocol fallback.")
+        $safeException.Data['AzureResponsesMetadata'] = $m
+        throw $safeException
+    }
+    $script:LastAzureResponsesMetadata = [pscustomobject]@{ status = $response.status; incomplete_details = $response.incomplete_details; usage = $response.usage; model = $response.model; errorCode = $response.error.code; errorParam = $response.error.param }
+    return Read-AIPyTeamResponsesResponse -Response $response
+}
+
 function Invoke-LLMChatCompletion {
     param (
         [string]$Provider,
@@ -1201,7 +1338,11 @@ function Invoke-LLMChatCompletion {
         [bool]$Stream,
         [string]$LogFolder,
         [string]$DeploymentChat,
-        [string]$ollamaModel
+        [string]$ollamaModel,
+        [ValidateRange(1, 2147483647)]
+        [int]$TimeOut = 240,
+        [ValidateSet('ChatCompletions', 'Responses')]
+        [string]$AzureOpenAIProtocol = 'ChatCompletions'
     )
 
     try {
@@ -1229,8 +1370,18 @@ function Invoke-LLMChatCompletion {
                 throw "-- Unsupported LLM provider: $Provider. This provider is not implemented yet."
             }
             "AzureOpenAI" {
+                if (-not $PSBoundParameters.ContainsKey('AzureOpenAIProtocol') -and $GlobalState.AzureOpenAIProtocol) { $AzureOpenAIProtocol = $GlobalState.AzureOpenAIProtocol }
+                if ($AzureOpenAIProtocol -eq 'Responses') {
+                    $responsesBudget = @{}
+                    if ($PSBoundParameters.ContainsKey('MaxTokens')) { $responsesBudget.MaxTokens = $MaxTokens }
+                    if ($PSBoundParameters.ContainsKey('TimeOut')) { $responsesBudget.TimeOut = $TimeOut }
+                    elseif ($GlobalState.AzureResponsesTimeoutSec) { $responsesBudget.TimeOut = $GlobalState.AzureResponsesTimeoutSec }
+                    return Invoke-AIPyTeamAzureResponses -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Deployment $DeploymentChat -Stream $Stream @responsesBudget
+                }
                 # Invoke the Azure OpenAI chat completion function
-                $response = Invoke-AIPyTeamAzureOpenAIChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat
+                $azureBudget = @{ TimeOut = $TimeOut }
+                if ($PSBoundParameters.ContainsKey('MaxTokens')) { $azureBudget.MaxTokens = $MaxTokens }
+                $response = Invoke-AIPyTeamAzureOpenAIChatCompletion -SystemPrompt $SystemPrompt -UserPrompt $UserPrompt -Temperature $Temperature -TopP $TopP -Stream $Stream -LogFolder $LogFolder -Deployment $DeploymentChat @azureBudget
                 return $response
             }
             default {
@@ -1243,13 +1394,18 @@ function Invoke-LLMChatCompletion {
         # Log the error and rethrow it with additional context
         $functionName = $MyInvocation.MyCommand.Name
         $errorMessage = "Error in ${functionName}: $_"
+        if ($Provider -eq 'AzureOpenAI' -and $AzureOpenAIProtocol -eq 'Responses') {
+            # Preserve the sanitized adapter exception/Data for callers even with ErrorActionPreference=Stop.
+            Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $LogFolder "ERROR.txt")
+            throw
+        }
         Write-Error $errorMessage
         Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $LogFolder "ERROR.txt")
         throw $_
     }
 }
 
-function Invoke-AIPSTeamAzureOpenAIChatCompletion {
+function Invoke-AIPyTeamAzureOpenAIChatCompletion {
     param (
         [string]$SystemPrompt,
         [string]$UserPrompt,
@@ -1258,7 +1414,9 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         [int]$MaxTokens,
         [bool]$Stream,
         [string]$LogFolder,
-        [string]$Deployment
+        [string]$Deployment,
+        [ValidateRange(1, 2147483647)]
+        [int]$TimeOut = 240
     )
 
     try {
@@ -1280,7 +1438,9 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
         }
 
         # Invoke the Azure OpenAI chat completion function
-        $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPSTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt
+        $azureBudget = @{ TimeOut = $TimeOut }
+        if ($PSBoundParameters.ContainsKey('MaxTokens')) { $azureBudget.MaxTokens = $MaxTokens }
+        $response = PSAOAI\Invoke-PSAOAIChatCompletion -SystemPrompt $SystemPrompt -usermessage $UserPrompt -Temperature $Temperature -TopP $TopP -LogFolder $LogFolder -Deployment $Deployment -User "AIPyTeam" -Stream $Stream -simpleresponse -OneTimeUserPrompt @azureBudget
 
         if ($Stream) {
             Write-Host "++ Streaming completed." -ForegroundColor Blue
@@ -1310,7 +1470,7 @@ function Invoke-AIPSTeamAzureOpenAIChatCompletion {
     }
 }
 
-function Invoke-AIPSTeamOllamaCompletion {
+function Invoke-AIPyTeamOllamaCompletion {
     param (
         [string]$SystemPrompt,
         [string]$UserPrompt,
@@ -1430,7 +1590,7 @@ function Invoke-AIPSTeamOllamaCompletion {
     return $response.Trim('"')
 }
 
-function Invoke-AIPSTeamLMStudioChatCompletion {
+function Invoke-AIPyTeamLMStudioChatCompletion {
     param (
         [string]$SystemPrompt,
         [string]$UserPrompt,
@@ -2142,7 +2302,6 @@ function Test-OllamaRunningModel {
             $firstModel = $script:ollamaModels[0]
             $script:ollamamodel = $firstModel.name
             $env:OLLAMA_MODEL = $script:ollamamodel
-            [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', $firstModel.Name, 'User')
             return $firstModel.Name
         }
         else {
@@ -2355,7 +2514,6 @@ function Set-EnvOllamaModel {
     param ($model)
     $env:OLLAMA_MODEL = $model
     $script:ollamaModel = $model
-    [System.Environment]::SetEnvironmentVariable('OLLAMA_MODEL', $model, 'User')
 }
 
 function Test-EnsureOllamaModelRunning {
@@ -2422,7 +2580,6 @@ if (-not $LoadProjectStatus) {
 }
 
 # Disabe PSAOAI importing banner
-[System.Environment]::SetEnvironmentVariable("PSAOAI_BANNER", "0", "User")
 $env:PSAOAI_BANNER = "0"
 
 # Check if the UserInput parameter is not provided
@@ -2437,127 +2594,7 @@ if (-not $UserInput) {
 
 Show-Banner
 
-#region ollama
-if ($GlobalState.LLMProvider -eq 'ollama' -and (-not $LoadProjectStatus)) {
-    $script:ollamaEndpoint = [System.Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'user')
-    if (-not $script:ollamaEndpoint.EndsWith('/')) {
-        $script:ollamaEndpoint += '/'
-    }
 
-    if ([string]::IsNullOrEmpty($script:ollamaEndpoint)) {
-        $defaultEndpoint = 'http://localhost:11434/'
-        try {
-            $script:ollamaEndpoint = $defaultEndpoint
-            $env:OLLAMA_ENDPOINT = $defaultEndpoint
-            [System.Environment]::SetEnvironmentVariable('OLLAMA_ENDPOINT', $defaultEndpoint, 'user')
-            if ([System.Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'user')) {
-                Write-Host "++ Environment variable 'OLLAMA_ENDPOINT' was set successfully ('$defaultEndpoint'). Set it manually if you need a non-default value: [System.Environment]::SetEnvironmentVariable('OLLAMA_ENDPOINT', '<your-ollama-api-endpoint>', 'user')" -ForegroundColor Green
-            }
-        }
-        # If setting the variable failed, display an error message
-        catch {
-            Write-Warning "-- Failed to set environment variable 'OLLAMA_ENDPOINT'."
-            return
-        } 
-    }
-
-    if (Test-OllamaAPI) {
-        Write-Host "++ Ollama API is reachable."
-        
-        # Check if Ollama is running with a model
-        $runningModelOllama = Test-OllamaRunningModel
-        if ($runningModelOllama) {
-            Write-Host "++ Ollama is running with model: $runningModelOllama"
-            Set-EnvOllamaModel -model $runningModelOllama
-        }
-        else {
-            Write-Host "-- No models are currently running in Ollama. Please check your Ollama configuration."
-            return
-        }
-    }
-    else {
-        Write-Warning "-- Ollama API is not reachable. Please check your Ollama installation and configuration."
-        return
-    }
-    Write-Host "If you want to change the model, please delete the OLLAMA_MODEL environment variable or set it to your desired value." -ForegroundColor Magenta
-}
-#endregion ollama
-
-#region LMStudio
-# Check if the LLM provider is 'lmstudio'
-if ($GlobalState.LLMProvider -eq 'lmstudio' -and (-not $LoadProjectStatus)) {
-    # Retrieve the LM Studio API key from the environment variables
-    $script:lmstudioApiKey = [System.Environment]::GetEnvironmentVariable('OPENAI_API_KEY', 'user')
-    # Retrieve the LM Studio API base URL from the environment variables
-    $script:lmstudioApiBase = [System.Environment]::GetEnvironmentVariable('OPENAI_API_BASE', 'user')
-    $env:OPENAI_API_KEY = $script:lmstudioApiKey
-    $env:OPENAI_API_BASE = $script:lmstudioApiBase
-    # If the API key is not set, use the default value 'lm-studio' and set it in the environment variables
-    if (-not $script:lmstudioApiKey) {
-        $script:lmstudioApiKey = 'lm-studio'
-        $env:OPENAI_API_KEY = $script:lmstudioApiKey
-        [System.Environment]::SetEnvironmentVariable('OPENAI_API_KEY', $script:lmstudioApiKey, 'user')
-        Write-Verbose "++ Default LM Studio API key set to 'lm-studio'"
-    }
-
-    # If the API base URL is not set, use the default value 'http://localhost:1234/v1' and set it in the environment variables
-    if (-not $script:lmstudioApiBase) {
-        $script:lmstudioApiBase = 'http://localhost:1234/v1'
-        $env:OPENAI_API_BASE = $script:lmstudioApiBase
-        [System.Environment]::SetEnvironmentVariable('OPENAI_API_BASE', $script:lmstudioApiBase, 'user')
-        Write-Verbose "++ Default LM Studio API base set to 'http://localhost:1234/v1'"
-    }
-
-    # Ensure the LMStudio endpoint ends with a '/'
-    if (-not $script:lmstudioApiBase.EndsWith('/')) {
-        $script:lmstudioApiBase += '/'
-    }
-
-    try {
-        $LMStudioServerResponse = Invoke-WebRequest -Uri $script:lmstudioApiBase
-        if ($LMStudioServerResponse.statuscode -eq "200") {
-            Write-Host "++ LM Studio server is running." -ForegroundColor Green
-        }
-        else {
-            Write-Host "-- LM Studio server not running." -ForegroundColor Yellow
-            return
-        }
-    }
-    catch [System.Net.WebException] {
-        Write-Warning "LM Studio server is not running or not reachable. Please ensure the server is up and running at $($script:lmstudioApiBase)."
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "LM Studio server is not running or not reachable"
-        Throw $_
-    }
-    catch {
-        Update-ErrorHandling -ErrorContext "LM Studio server is not running or not reachable"-ErrorRecord $_
-    }
-    # Test lm-studio for model
-    try {
-        $LMStudioModelResponse = Invoke-RestMethod -Uri "$($script:lmstudioApiBase)models" -Method GET
-        if ($LMStudioModelResponse.data.Count -eq 0) {
-            Write-Host "-- No models loaded. Please load a model in LM Studio first."
-            return
-        }
-        elseif ($LMStudioModelResponse.data.Count -gt 1) {
-            Write-Host "++ LM Studio is running in Multi Model Session. Only one model can be chosen. Choosing the first one."
-        }
-        if ($LMStudioModelResponse.data[0].id) {
-            $script:LMStudioModel = $LMStudioModelResponse.data[0].id
-        }
-    }
-    catch [System.Net.WebException] {
-        #System.InvalidOperationException
-        Write-Warning "LM Studio server is not running or not reachable. Please ensure the server is up and running at $($script:lmstudioApiBase)."
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "LM Studio server is not running or not reachable"
-        Throw $_
-    }
-    catch {
-        Update-ErrorHandling -ErrorContext "LM Studio server is not running or not reachable" -ErrorRecord $_
-        #Throw $_.Exception.Message
-    }
-
-}
-#endregion LMStudio
 
 $scriptname = "AIPyTeam"
 if ($LoadProjectStatus) {
@@ -2578,6 +2615,7 @@ if ($LoadProjectStatus) {
     try {
         # Load the project state from the specified file
         $GlobalState = Get-ProjectState -FilePath $LoadProjectStatus
+        if (-not $GlobalState) { throw "Project state could not be loaded." }
         Write-Information "++ Project state loaded successfully from $LoadProjectStatus" -InformationAction Continue
         # Output verbose information about the loaded project state
         Write-Verbose "`$GlobalState.TeamDiscussionDataFolder: $($GlobalState.TeamDiscussionDataFolder)"
@@ -2614,6 +2652,7 @@ if ($LoadProjectStatus) {
     catch [System.Exception] {
         # Handle any exceptions that occur during the loading of the project state
         Update-ErrorHandling -ErrorRecord $_ -LogFilePath (Join-Path (split-path -Path $LoadProjectStatus -Parent) "ERROR.txt")
+        return $false
     }
 }
 else {
@@ -2647,6 +2686,46 @@ else {
         return $false
     }
 }
+# Resolve effective saved selection before any provider startup or workflow dispatch.
+$null = Resolve-AIPyTeamAzureProtocol -State $GlobalState -Protocol $AzureOpenAIProtocol
+if ($GlobalState.PSObject.Properties.Name -notcontains 'AzureResponsesTimeoutSec') {
+    $GlobalState | Add-Member -NotePropertyName AzureResponsesTimeoutSec -NotePropertyValue $AzureResponsesTimeoutSec
+}
+if ($GlobalState.LLMProvider -eq 'AzureOpenAI') {
+    Write-Information "++ Azure protocol: $($GlobalState.AzureOpenAIProtocol)" -InformationAction Continue
+    if ($GlobalState.AzureOpenAIProtocol -eq 'Responses') {
+        $null = New-AIPyTeamResponsesRequest -Endpoint $env:PSAOAI_API_AZURE_OPENAI_ENDPOINT -ApiKey $env:PSAOAI_API_AZURE_OPENAI_KEY -Deployment $DeploymentChat -MaxTokens $GlobalState.MaxTokens -TimeOut $GlobalState.AzureResponsesTimeoutSec -Stream $GlobalState.Stream
+    }
+}
+#region ollama
+if ($GlobalState.LLMProvider -eq 'ollama') {
+    $script:ollamaEndpoint = $env:OLLAMA_ENDPOINT
+    if (-not $script:ollamaEndpoint) { $script:ollamaEndpoint = [Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'User') }
+    if (-not $script:ollamaEndpoint) { $script:ollamaEndpoint = 'http://localhost:11434/' }
+    $script:ollamaEndpoint = $script:ollamaEndpoint.TrimEnd('/') + '/'
+    if (-not (Test-OllamaAPI)) { throw 'Ollama API is not reachable.' }
+    $runningModelOllama = Test-OllamaRunningModel
+    if (-not $runningModelOllama) { throw 'No running Ollama model.' }
+    Set-EnvOllamaModel -model $runningModelOllama
+}
+#endregion ollama
+
+#region LMStudio
+if ($GlobalState.LLMProvider -eq 'LMStudio') {
+    $script:lmstudioApiKey = $env:OPENAI_API_KEY
+    if (-not $script:lmstudioApiKey) { $script:lmstudioApiKey = [Environment]::GetEnvironmentVariable('OPENAI_API_KEY', 'User') }
+    if (-not $script:lmstudioApiKey) { $script:lmstudioApiKey = 'lm-studio' }
+    $script:lmstudioApiBase = $env:OPENAI_API_BASE
+    if (-not $script:lmstudioApiBase) { $script:lmstudioApiBase = [Environment]::GetEnvironmentVariable('OPENAI_API_BASE', 'User') }
+    if (-not $script:lmstudioApiBase) { $script:lmstudioApiBase = 'http://localhost:1234/v1' }
+    $script:lmstudioApiBase = $script:lmstudioApiBase.TrimEnd('/') + '/'
+    $script:LMStudioModel = $null
+    $LMStudioModelResponse = Invoke-RestMethod -Uri "$($script:lmstudioApiBase)models" -Method GET -Headers @{ Authorization = "Bearer $script:lmstudioApiKey" } -ErrorAction Stop
+    if (-not $LMStudioModelResponse.data -or -not $LMStudioModelResponse.data[0].id) { throw 'No models loaded in LM Studio.' }
+    $script:LMStudioModel = $LMStudioModelResponse.data[0].id
+}
+#endregion LMStudio
+
 try {
     $DocumentationFullName = Join-Path $GlobalState.TeamDiscussionDataFolder "Documentation.txt" -ErrorAction Stop
     $ProjectfilePath = Join-Path $GlobalState.TeamDiscussionDataFolder "Project.xml" -ErrorAction Stop
@@ -3155,9 +3234,9 @@ Please format your response as follows:
 1. Script Purpose: (Brief description of what the script does)
 2. Input Parameters: (List of input parameters, if any)
 3. Output: (Description of what the script returns or produces)
-4. Python code: (The actual code, properly formatted and commented)
+4. Python code: (Production code only, properly formatted and commented. Include all production helpers in this single-file export; no imports of unpublished local files. Do not include development tests in section 4.)
 5. Usage Example: (A brief example of how to use the script)
-6. Self-Review Notes: (Any observations or potential improvements you've identified)
+6. Self-Review Notes: (Any observations or potential improvements you've identified; place any optional development-only acceptance tests here, outside section 4.)
 
 $($projectManager.Name) Guidelines:
 ````````text
@@ -3395,8 +3474,8 @@ do {
                 Show-Header -HeaderText "Save Project State"
                 if (-not (Test-Path $ProjectfilePath)) {
                     try {
-                        Save-ProjectState -FilePath $ProjectfilePath -GlobalState $GlobalState
-                        if (Test-Path -Path $ProjectfilePath) {
+                        $saved = Save-ProjectState -FilePath $ProjectfilePath -GlobalState $GlobalState
+                        if ($saved) {
                             Write-Information "++ Project state saved successfully to $ProjectfilePath" -InformationAction Continue
                         }
                         else {
@@ -3410,8 +3489,8 @@ do {
                 else {
                     $userChoice = Read-Host -Prompt "File 'Project.xml' exists. Do you want to save now? (Y/N)"
                     if ($userChoice -eq 'Y' -or $userChoice -eq 'y') {
-                        Save-ProjectState -FilePath $ProjectfilePath -GlobalState $GlobalState
-                        if (Test-Path -Path $ProjectfilePath) {
+                        $saved = Save-ProjectState -FilePath $ProjectfilePath -GlobalState $GlobalState
+                        if ($saved) {
                             Write-Information "++ Project state saved successfully to $ProjectfilePath" -InformationAction Continue
                         }
                         else {
@@ -3519,7 +3598,7 @@ do {
 if (-not $GlobalState.NOLog) {
     # Log Developer last memory
     $TheFinalCodeFullName = Join-Path $GlobalState.TeamDiscussionDataFolder "TheCodeF.py"
-    $GlobalState.lastpydevCode | Out-File -FilePath $TheFinalCodeFullName
+    $GlobalState.lastpydevCode | Out-File -FilePath $TheFinalCodeFullName -Encoding UTF8 -ErrorAction Stop
     if (Test-Path -Path $TheFinalCodeFullName) {
         # Call the function to check the code in 'TheCode.py' file
         Write-Information "++ The final code was exported to $TheFinalCodeFullName" -InformationAction Continue
@@ -3531,8 +3610,8 @@ if (-not $GlobalState.NOLog) {
     Stop-Transcript
 }
 #endregion Final code
-Save-ProjectState -FilePath $ProjectfilePath -GlobalState $GlobalState
-if ($ProjectfilePath) {
+$saved = Save-ProjectState -FilePath $ProjectfilePath -GlobalState $GlobalState
+if ($saved) {
     Write-Host "`n`n++ Your progress on Project has been saved!`n`n"
     Write-Host "++ You can resume working on this project at any time by loading the saved state. Just run:`nAIPyTeam.ps1 -LoadProjectStatus `"$ProjectfilePath`"`n`n"
 }

@@ -1,0 +1,2 @@
+# Preserve raw bytes of the retained, hash-bound Developer response.
+/tools/tests/fixtures/developer-full120-response10.txt -text

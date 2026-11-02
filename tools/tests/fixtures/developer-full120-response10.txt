@@ -1,0 +1,292 @@
+﻿## 1. Script Purpose
+
+Provide a reusable `greet()` function and a minimal command-line interface that prints `Hello, name!`, preserving the name exactly.
+
+This revision retains the existing implementation and clarifies documentation. No new CLI features, dependencies, or logging of supplied names are introduced.
+
+## 2. Input Parameters
+
+- **CLI:** One required positional argument, `name`.
+  - Quote names containing spaces.
+  - Use `--` before names beginning with `-`.
+  - Empty strings, whitespace, Unicode, and punctuation remain unchanged.
+- **`greet(name: str)`**: The name to include in the greeting.
+- **`main(argv: Optional[Sequence[str]] = None)`**: Optional argument sequence, excluding the program name. `None` uses the process command line.
+
+Supported baseline: **Python 3.9+**. Type hints document the API; they do not perform runtime validation.
+
+## 3. Output
+
+- `greet()` returns the greeting without printing.
+- Successful CLI execution prints the greeting followed by a newline and exits with status `0`.
+- Help exits with status `0`.
+- Invalid arguments produce standard `argparse` diagnostics on stderr and exit with status `2`.
+- Output failures propagate normally rather than being converted into success.
+
+## 4. Python code
+
+### Production script: `greet.py`
+
+```python
+"""Provide an exact-input greeting function and a minimal CLI.
+
+Supported runtime: Python 3.9 or newer.
+"""
+
+import argparse
+from typing import Optional, Sequence
+
+
+def greet(name: str) -> str:
+    """Return 'Hello, name!' without modifying the supplied string.
+
+    The type annotation documents the string-input contract; it does not
+    enforce runtime validation.
+    """
+    return f"Hello, {name}!"
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    """Parse arguments, print a greeting, and return 0 on success.
+
+    Args:
+        argv: Arguments excluding the program name. None uses the process
+            command-line arguments.
+
+    Raises:
+        SystemExit: argparse exits with 0 for help or 2 for invalid arguments.
+
+    Output failures propagate to the caller without custom recovery.
+    """
+    parser = argparse.ArgumentParser(
+        description="Print a personalized greeting."
+    )
+    parser.add_argument("name", help="Name to greet")
+    args = parser.parse_args(argv)
+
+    print(greet(args.name))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+
+**Version notes — this revision**
+
+- Retained the two-function structure, injectable arguments, and entry-point guard.
+- Simplified module documentation and consistently stated Python 3.9+ support.
+- Clarified that annotations do not validate inputs.
+- Preserved exact-input handling, standard argument errors, and output-error propagation.
+- Kept revision history here rather than adding a version option or release-history prose to the module.
+
+### Development-only acceptance tests
+
+The following standard-library tests are separate from the production script. Run them from the directory containing `greet.py`; they are not required for normal operation.
+
+```python
+"""Acceptance tests for greet.py; run separately from the production file."""
+
+import io
+from contextlib import redirect_stderr, redirect_stdout
+from pathlib import Path
+import subprocess
+import sys
+import unittest
+from unittest.mock import patch
+
+import greet as greeting
+
+
+SCRIPT = Path("greet.py").resolve()
+
+NAME_CASES = (
+    ("Ada", "Hello, Ada!"),
+    ("Ada Lovelace", "Hello, Ada Lovelace!"),
+    ("", "Hello, !"),
+    (" Ada ", "Hello,  Ada !"),
+    ("José", "Hello, José!"),
+    ("Ada!", "Hello, Ada!!"),
+    ("A\nB", "Hello, A\nB!"),
+)
+
+
+class GreetingTests(unittest.TestCase):
+    """Verify the function contract and CLI behavior."""
+
+    def run_process(
+        self, argv: list[str]
+    ) -> subprocess.CompletedProcess:
+        """Run the CLI with the active interpreter, without a shell."""
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), *argv],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env=None,
+            check=False,
+        )
+
+    def test_greet_preserves_input_without_printing(self) -> None:
+        """All supported string cases return exactly the expected text."""
+        for name, expected in NAME_CASES:
+            with self.subTest(name=name):
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    result = greeting.greet(name)
+
+                self.assertIsInstance(result, str)
+                self.assertEqual(result, expected)
+                self.assertEqual(stdout.getvalue(), "")
+                self.assertEqual(stderr.getvalue(), "")
+
+    def test_main_success(self) -> None:
+        """Injected arguments produce exact output and success."""
+        for name, expected in NAME_CASES:
+            with self.subTest(name=name):
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    status = greeting.main([name])
+
+                self.assertEqual(status, 0)
+                self.assertEqual(stdout.getvalue(), expected + "\n")
+                self.assertEqual(stderr.getvalue(), "")
+
+    def test_option_terminator(self) -> None:
+        """The option terminator permits a dash-prefixed name."""
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            status = greeting.main(["--", "-Ada"])
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stdout.getvalue(), "Hello, -Ada!\n")
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_main_help_and_errors(self) -> None:
+        """Check stable properties rather than complete argparse messages."""
+        scenarios = (
+            (["--help"], 0),
+            ([], 2),
+            (["Ada", "Lovelace"], 2),
+            (["--unknown"], 2),
+        )
+        for argv, expected_status in scenarios:
+            with self.subTest(argv=argv):
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    with self.assertRaises(SystemExit) as caught:
+                        greeting.main(argv)
+
+                self.assertEqual(caught.exception.code, expected_status)
+                if expected_status == 0:
+                    self.assertIn("usage:", stdout.getvalue().lower())
+                    self.assertNotIn("Hello,", stdout.getvalue())
+                    self.assertEqual(stderr.getvalue(), "")
+                else:
+                    self.assertEqual(stdout.getvalue(), "")
+                    self.assertIn("usage:", stderr.getvalue().lower())
+                    self.assertIn("error:", stderr.getvalue().lower())
+
+    def test_process_success(self) -> None:
+        """Normal execution consumes the process command line."""
+        result = self.run_process(["Ada Lovelace"])
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "Hello, Ada Lovelace!\n")
+        self.assertEqual(result.stderr, "")
+
+    def test_process_help_and_errors(self) -> None:
+        """Help and invalid invocations retain their process exit statuses."""
+        for argv, expected_status in (
+            (["--help"], 0),
+            ([], 2),
+            (["Ada", "Lovelace"], 2),
+            (["--unknown"], 2),
+        ):
+            with self.subTest(argv=argv):
+                result = self.run_process(argv)
+                self.assertEqual(result.returncode, expected_status)
+                if expected_status == 0:
+                    self.assertIn("usage:", result.stdout.lower())
+                    self.assertNotIn("Hello,", result.stdout)
+                    self.assertEqual(result.stderr, "")
+                else:
+                    self.assertEqual(result.stdout, "")
+                    self.assertIn("error:", result.stderr.lower())
+
+    def test_import_is_safe(self) -> None:
+        """Importing must not parse unexpected arguments or emit output."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import greet; "
+                    "assert callable(greet.greet); "
+                    "assert callable(greet.main)"
+                ),
+                "--unexpected",
+            ],
+            cwd=str(SCRIPT.parent),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "")
+
+    def test_output_failure_propagates(self) -> None:
+        """A failed output write must not falsely return success."""
+        with patch("sys.stdout") as stdout:
+            stdout.write.side_effect = OSError("Simulated output failure")
+            with self.assertRaises(OSError):
+                greeting.main(["Ada"])
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+The tests use Python 3.9’s built-in generic annotation `list[str]`. This avoids importing `typing.List` while retaining static type information: [PEP 585 — built-in generic types](https://docs.python.org/3/whatsnew/3.9.html#pep-585-type-hinting-generics-in-standard-collections). The production script retains `Optional[Sequence[str]]`, avoiding Python 3.10-only union syntax.
+
+## 5. Usage Example
+
+```bash
+python greet.py Ada
+# Hello, Ada!
+
+python greet.py "Ada Lovelace"
+# Hello, Ada Lovelace!
+
+python greet.py -- "-Ada"
+# Hello, -Ada!
+
+python greet.py --help
+```
+
+Imported use:
+
+```python
+from greet import greet, main
+
+message = greet(" Ada ")
+assert message == "Hello,  Ada !"
+
+status = main(["Ada"])
+assert status == 0
+```
+
+## 6. Self-Review Notes
+
+- **Scope:** No functional rewrite or unrequested extensions were introduced.
+- **Error handling and diagnostics:** `argparse` handles usage errors. Output exceptions deliberately propagate. Additional logging is omitted because this CLI needs no persistent diagnostics and logging supplied names could expose personal data.
+- **Maintainability:** Two small, typed functions; standard library only; no supporting files needed in production.
+- **Efficiency:** Greeting construction uses time and memory proportional to the name length. Caching or concurrency would not benefit this workload.
+- **Security:** No shell execution, networking, dynamic evaluation, or persistence. Terminal control characters remain unchanged as required; use with untrusted external data would need a separate safety review.
+- **Verification status:** Static review completed; tests supplied but **not executed here**. Runtime test results, coverage, cross-platform compatibility, and benchmarks remain unmeasured. Unicode output still depends on the destination stream’s encoding.
