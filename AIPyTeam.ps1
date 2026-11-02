@@ -752,9 +752,10 @@ function Show-Banner {
    d8'          `8b  88  88               Y88'     88   `"Ybbd8"'  `"8bbdP"Y8  88      88      88  
                                           d8'                                                      
                                          d8'                                                                                                                                         
-   AI Python Team with RAG                                                owered by PSAOAI Module
+   AI Python Team with RAG                                                Powered by PSAOAI Module
                                                                                     Ollama
                                                                                     LM Studio
+                                                                                    llama.cpp
                                                                                     AZURE Bing Web
    https://github.com/voytas75/AIPyTeam
   
