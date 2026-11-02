@@ -6,6 +6,28 @@
 
 [![PowerShell Gallery](https://img.shields.io/powershellgallery/dt/AIPyTeam)](https://www.powershellgallery.com/packages/AIPyTeam) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/f5d2f35fe975465c8111f3e14fd57ed3)](https://app.codacy.com/gh/voytas75/AIPyTeam/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
+## First use (0.1.0 beta)
+
+Requires native Windows PowerShell 5.1 or PowerShell 7, PSAOAI (retain the existing minimum 0.3.2; controlled qualification used 0.7.0), and PowerHTML (qualification used 0.2.0). Install dependencies explicitly if missing; startup/update checks may contact Gallery. No automatic install or repository-trust change is part of the release handoff.
+
+Use the current checkout's `AIPyTeam.ps1`; version-neutral `Install-Script AIPyTeam` retrieves the version actually published by the owner, not necessarily this checkout. See [release notes](docs/ReleaseNotes.md) and [Azure configuration](docs/azure-responses.md).
+
+Azure Responses uses existing shared **Process** `PSAOAI_API_AZURE_OPENAI_ENDPOINT` and `PSAOAI_API_AZURE_OPENAI_KEY`. Configure them using PSAOAI's secure mechanism in the same Windows user/session; its Windows DPAPI key is decoded only in memory. Never paste keys into chat, commands, project files or transcripts. Pass deployment explicitly to bypass the historical User-scope default.
+
+```powershell
+.\AIPyTeam.ps1 -userInput 'Create a single-file Python greeting CLI using only the standard library' -DeploymentChat $env:PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT -NORAG -MaxTokens 10240 -AzureResponsesTimeoutSec 120
+```
+
+This explicit historical qualified transport profile is **not** the product default (20480 tokens / HTTP60s), a fresh live qualification of 0.1.0, or a total-workflow deadline. Fresh Azure defaults to Responses and omitted Stream=false; explicit Chat/local providers retain true. Responses does not support streaming. Review cost and output before running; all agents can issue requests and no global ten-request cap is enforced by this command.
+
+Outputs include retained Python drafts/final `TheCodeF.py`, logs and saved `Project.xml` in the reported project folder. Review generated code and dependencies before executing it. `Completed` records workflow/persistence success, not runnable Python certification; `Partial` retains last-good code, `Failed` has no draft, legacy states use `NotRecorded`. A failed stage stops automatic downstream requests.
+
+```powershell
+.\AIPyTeam.ps1 -LoadProjectStatus 'C:\Projects\MyProject\Project.xml'
+```
+
+Recovery preserves the saved folder/provider/protocol/Stream/outcome. Loading alone never certifies completion; menu actions can invoke the provider. Keep logging enabled: `NOLog` affects export/validation paths, not merely console visibility. Python exports were checked with Python `ast.parse`, never executed; PSScriptAnalyzer is not a Python validator. Historical advanced examples below are not individually live-qualified.
+
 ## Table of Contents
 
 - [AI Python Team with RAG](#ai-python-team-with-rag)
@@ -69,7 +91,7 @@ By leveraging the Bing Web Search API, the AI Python Team can provide enhanced s
 - **Live Streaming**: Option to stream output live.
 - **Logging**: Logs actions and responses of each specialist.
 - **Documentation Generation**: Automatically generates comprehensive documentation for the project.
-- **Code Analysis**: Integrates with PSScriptAnalyzer for code quality checks.
+- **Code Analysis**: Python syntax is qualified separately with `ast.parse`; PSScriptAnalyzer does not validate Python.
 - **Feedback Integration**: Collects and integrates feedback from team members to improve the response.
 - **State Management**: Manages global state across different stages of the project. Saved `Project.xml` records `WorkflowOutcome` (`Completed`, `Partial`, `Failed`, or legacy `NotRecorded`), `FailedStage`, and a fixed safe `WorkflowErrorCode`. A failed stage stops automatic downstream work; a last-good draft remains available for inspection/save in the menu. `Partial` means a retained draft, not a completed or runnable project. Initial failure without a draft is `Failed`; no empty final Python file is written. Loading a project preserves its outcome and does not certify completion. Explicit menu operations remain available but do not retroactively complete an interrupted workflow. Failed state saving is reported separately and never announced as completed.
 - **Error Handling**: Robust error handling mechanisms to capture and log errors.
@@ -103,7 +125,7 @@ By leveraging the Bing Web Search API, the AI Python Team can provide enhanced s
 
 - **Parameters**:
   - `userInput`: Defines the project outline as a string (can also be piped).
-  - `Stream`: Controls whether the output should be streamed live (default: `$true`).
+  - `Stream`: Omitted false for fresh Azure Responses; true for Chat/local; saved settings retained.
   - `NOPM`: Disables the Project Manager functions.
   - `NODocumentator`: Disables the Documentator functions.
   - `NOLog`: Disables the logging functions.
@@ -177,13 +199,13 @@ The `OLLAMA_ENDPOINT` environment variable is set to a default value of `http://
 
 4. **RAG Configuration**:
    - `AZURE_BING_API_KEY`: Your Azure Bing Web Search API key.
-   - `AZURE_BING_ENDPOINT`: Your Azure Bing Web Search endpoint. ()
+   - `AZURE_BING_SEARCH_ENDPOINT`: Your Azure Bing Web Search endpoint. ()
 
    Example:
 
    ```powershell
    [System.Environment]::SetEnvironmentVariable('AZURE_BING_API_KEY','your-azure-bing-api-key','user')
-   [System.Environment]::SetEnvironmentVariable('AZURE_BING_ENDPOINT','https://api.bing.microsoft.com/','user')
+   [System.Environment]::SetEnvironmentVariable('AZURE_BING_SEARCH_ENDPOINT','https://api.bing.microsoft.com/','user')
    ```
 
 [Bing Search API documentation](https://learn.microsoft.com/en-us/bing/search-apis/bing-web-search/)

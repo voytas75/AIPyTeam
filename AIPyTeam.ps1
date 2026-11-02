@@ -1,5 +1,5 @@
 ﻿<#PSScriptInfo
-.VERSION 0.0.3
+.VERSION 0.1.0
 .GUID 2473f758-a87e-4f85-9e61-0331c3e88767
 .AUTHOR voytas75
 .TAGS python,ai,psaoai,llm,project,team,gpt,ollama,azure,bing,RAG
@@ -23,7 +23,7 @@ This script simulates a team of AI-powered Agents with RAG, each with a unique r
 Defines the project outline as a string. The default is to monitor RAM usage and show a color block based on the load. This parameter can also accept input from the pipeline.
 
 .PARAMETER Stream 
-Controls whether the output should be streamed live. The default is `$true`.
+Controls live streaming. Omitted: false for fresh Azure Responses; true for ChatCompletions and local providers. Saved projects retain their setting.
 
 .PARAMETER NOPM 
 Disables the Project Manager functions when used.
@@ -70,12 +70,12 @@ PS> "Monitor CPU usage and display dynamic graph." | AIPyTeam -Stream $false
 This command runs the script without streaming output live (-Stream $false) and specifies custom user input about monitoring CPU usage instead of RAM, displaying it through dynamic graphing methods rather than static color blocks.
 
 .NOTES 
-Version: 0.0.3
+Version: 0.1.0
 Author: voytas75
 Creation Date: 2024.07
 
 .LINK
-https://www.Pythongallery.com/packages/AIPyTeam
+https://www.powershellgallery.com/packages/AIPyTeam
 https://github.com/voytas75/AIPyTeam/
 #>
 [CmdletBinding()]
@@ -126,7 +126,7 @@ param(
     [ValidateRange(1, 2147483647)]
     [int]$AzureResponsesTimeoutSec = 60
 )
-$AIPyTeamVersion = "0.0.3"
+$AIPyTeamVersion = "0.1.0"
 
 #region ProjectTeamClass
 <#

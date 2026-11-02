@@ -1,6 +1,11 @@
 # Bounded stabilization checkpoint
 
-## Active checkpoint: approved fail-stop and partial-state slice (local only)
+## Active checkpoint: 0.1.0 beta release preparation
+- Historical implementation was delivered as baseline HEAD `5387ab2dc06f8d7099535a12e760d6047058c39a`, source SHA256 `0979144b9804d835454ac7ef9511f5bafc948960cca7dec5fb40a5249bdde83c`. The local-only statements below describe their historical slice, not current delivery status.
+- Current release preparation is uncommitted: only 0.1.0 metadata/help and necessary documentation corrections, with hash-bound offline native refresh and manual publication handoff. No new feature/API/configuration/budget changes, live inference, commit/push, owner-checkout sync or Gallery upload. Artifact manifest records final raw source/documentation hashes; no current documentation commit is invented.
+- Published baseline is 0.0.3; 0.1.0 availability is checked read-only during preparation and must be rechecked by the owner immediately before upload. Offline package construction is not Gallery acceptance.
+
+## Historical checkpoint: approved fail-stop and partial-state slice (local only)
 - Approved scope is only automatic fail-stop, explicit persisted workflow outcome/stage and last-good draft preservation, with native offline tests and this minimal documentation update. No token-budget/default/protocol/prompt/exporter/CI changes or general workflow engine.
 - Baseline clean master `4adb86b5c08e95d2d0effbf73b1e3d6a871147e6`, source SHA256 `19b3aae3d9b961a87aa453cb3e1b2456535a06ac11936658253cbffa60a44fea`. New source SHA256 `0979144b9804d835454ac7ef9511f5bafc948960cca7dec5fb40a5249bdde83c` supersedes earlier source qualification; historical/live evidence is not qualification of these new bytes.
 - Meaningful native5.1/7 RED: fourth failure had4 synthetic POSTs and3 later denied application attempts; Manager/initial Developer failure did not save outcome state. GREEN: fourth failure4 POSTs, ZERO later attempts, saved `Partial`/`Analyst/Developer`/`StageFailed` and last-good production code; initial failures1/2 POSTs, saved `Failed`/Manager or Developer, no empty final draft. Original recovery of the actual partial Project.xml on both native runtimes makes0 POSTs and preserves outcome/config/code; load alone never invents completion. Legacy fields default `NotRecorded` with empty stage/code.
