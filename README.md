@@ -45,6 +45,8 @@ From the checkout directory, with the existing Process deployment configured:
 - Fresh Azure defaults to Responses with omitted Stream=false. Streaming/SSE is unsupported for Responses.
 - 10240 tokens / HTTP120s is an explicit historical transport profile, **not** the product defaults of 20480 / HTTP60s, a workflow deadline or fresh live acceptance of current bytes.
 
+For concise console output, append `-MinimalOutput`: Polish startup settings and explicitly supplied parameter descriptions, processing notices and confirmed export/save notices instead of model text. It is invocation-only and independent of `-NOInteraction` and `-NOLog`; logs may still contain complete model text. Dependency banners from `#Requires` are not suppressed.
+
 ## Results and recovery
 
 Use the reported timestamped project directory (default root `MyDocuments/AIPyTeam`, or `-LogFolder`). It can contain versioned Python drafts, final `TheCodeF.py`, logs and saved `Project.xml`.

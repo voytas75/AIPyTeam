@@ -37,7 +37,8 @@ $suites = @(
     @{name='LlamaCpp';parameter='RepositoryRoot';count=39;receipt='receipt.json'},
     @{name='DependencyStartup';parameter='RepositoryRoot';count=4;receipt='receipt.json'},
     @{name='PromptContracts';parameter='RepositoryRoot';count=12;receipt='receipt.json'},
-    @{name='PromptRequestChain';parameter='RepositoryRoot';count=6;receipt='receipt.json'}
+    @{name='PromptRequestChain';parameter='RepositoryRoot';count=6;receipt='receipt.json'},
+    @{name='MinimalOutput';parameter='RepositoryRoot';count=29;receipt='receipt.json'}
 )
 # Fresh native process per suite. Never inspect inherited credential values.
 $wrapper = Join-Path $EvidenceRoot 'child.ps1'

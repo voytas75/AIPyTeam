@@ -15,6 +15,7 @@ Use `-UserInput` or a scalar pipeline description. A synthetic, standard-library
 | Option | Effect |
 | --- | --- |
 | `UserInput` | Fresh project description; NOInteraction requires nonblank input. |
+| `MinimalOutput` | Invocation-only presentation: hides logo/model text and raw state dumps; preserves logs, exports, requests, warnings/errors and interactive questions/menu. Does not imply NOInteraction or NOLog. |
 | `NOInteraction` | Invocation-only: suppresses AIPyTeam questions and menu; not persisted. Validates active configuration before discovery/inference. |
 | `ReducedWorkflow` | Persisted Manager/Developer-only workflow; fresh and legacy default false, saved value wins on recovery. |
 | `NORAG` | Disables retrieval for a fresh project; not implicit in reduced mode. Saved RAG wins on load. |
@@ -40,6 +41,14 @@ For a fuller review with both reports omitted, remove reduced mode explicitly fr
 ```powershell
 .\AIPyTeam.ps1 -UserInput 'Create a standard-library Python CSV summary CLI' -DeploymentChat $env:PSAOAI_API_AZURE_OPENAI_CC_DEPLOYMENT -NOInteraction -NORAG -NOPM -NODocumentator -MaxTokens 10240 -AzureResponsesTimeoutSec 120 -LogFolder 'C:\Projects\AIPyTeamDrafts'
 ```
+
+## Minimal console output
+
+Append `-MinimalOutput` to an existing command (including recovery). Startup reports effective provider/protocol/model, workflow, Stream, RAG and noninteractive mode after state/provider resolution. A separate stable alphabetical list describes only explicitly supplied parameters in Polish; its invocation values do not override saved-state precedence. UserInput content is omitted; credentials/endpoints are not read or displayed by the new summary.
+
+Processing notices are synchronous, not a spinner. Export/save notices follow successful writes; workflow completion is not Python quality validation. Without the flag, model display stays unchanged; the startup summary is added in both modes. Interactive choices remain visible and usable.
+
+This is **not a privacy mode**: team logs, saved state, exports and transcript remain enabled unless NOLog is separately selected. Logs can retain complete prompts/model text; hiding stdout does not guarantee a private transcript. PSAOAI imported by `#Requires` may print its own banner before parameters can be evaluated. No global information preference, environment banner setting or import policy is changed.
 
 ## Outputs and failure states
 

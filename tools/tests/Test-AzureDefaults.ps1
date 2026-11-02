@@ -16,7 +16,7 @@ function Show-Banner {}
 function Update-ErrorHandling {param($ErrorRecord,$ErrorContext,$LogFilePath) throw $ErrorRecord}
 '@
 $probe=Join-Path $EvidenceRoot 'original-startup.ps1'
-[IO.File]::WriteAllText($probe,('[CmdletBinding()]'+"`n"+$prefix+"`n"+$functions+"`n"+$guard+"`n"+$s.Substring($start,$end-$start)+"`n"+'return $GlobalState'))
+[IO.File]::WriteAllText($probe,('[CmdletBinding()]'+"`n"+$prefix+"`n"+$functions+"`n"+$guard+"`n"+$s.Substring($start,$end-$start)+"`n"+'return $GlobalState'),[Text.UTF8Encoding]::new($true))
 $env:PSAOAI_API_AZURE_OPENAI_ENDPOINT='https://fixture.invalid/'
 $env:PSAOAI_API_AZURE_OPENAI_KEY='synthetic-key'
 $rows=@()
