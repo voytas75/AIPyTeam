@@ -83,7 +83,7 @@ param(
     [Parameter(Mandatory = $false, ValueFromPipeline = $true, HelpMessage = "Defines the Python project outline as a string.")]
     [string] $userInput,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Controls whether the output should be streamed live. Default is `$true.")]
+    [Parameter(Mandatory = $false, HelpMessage = "Controls live streaming. Omitted: false for fresh Azure Responses; true for Chat and local providers. Saved projects retain their setting.")]
     [bool] $Stream = $true,
     
     [Parameter(Mandatory = $false, HelpMessage = "Disables the RAG functionality.")]
@@ -121,7 +121,7 @@ param(
     [string]$LLMProvider = "AzureOpenAI",
 
     [ValidateSet('ChatCompletions', 'Responses')]
-    [string]$AzureOpenAIProtocol = 'ChatCompletions',
+    [string]$AzureOpenAIProtocol = 'Responses',
 
     [ValidateRange(1, 2147483647)]
     [int]$AzureResponsesTimeoutSec = 60
@@ -2556,6 +2556,10 @@ if ($NORAG) {
 }
 
 if (-not $LoadProjectStatus) {
+    # Responses has no SSE adapter. Preserve explicit Stream and local/Chat defaults.
+    if (-not $PSBoundParameters.ContainsKey('Stream') -and $LLMProvider -eq 'AzureOpenAI' -and $AzureOpenAIProtocol -eq 'Responses') {
+        $Stream = $false
+    }
     # Define a state management object
     $GlobalState = [PSCustomObject]@{
         TeamDiscussionDataFolder = $null
@@ -2687,6 +2691,10 @@ else {
     }
 }
 # Resolve effective saved selection before any provider startup or workflow dispatch.
+# Legacy projects predate Responses: retain Chat unless the owner explicitly selects a protocol.
+if ($LoadProjectStatus -and $GlobalState.PSObject.Properties.Name -notcontains 'AzureOpenAIProtocol' -and -not $PSBoundParameters.ContainsKey('AzureOpenAIProtocol')) {
+    $AzureOpenAIProtocol = 'ChatCompletions'
+}
 $null = Resolve-AIPyTeamAzureProtocol -State $GlobalState -Protocol $AzureOpenAIProtocol
 if ($GlobalState.PSObject.Properties.Name -notcontains 'AzureResponsesTimeoutSec') {
     $GlobalState | Add-Member -NotePropertyName AzureResponsesTimeoutSec -NotePropertyValue $AzureResponsesTimeoutSec

@@ -1,5 +1,14 @@
 # Bounded stabilization checkpoint
 
+## Active checkpoint: approved Azure default Responses (local only)
+- Baseline discovered clean master `803af61c12a27f0dfde54224a9bf7bc3b927ab6c`. Fresh Azure now defaults to Responses; omitted Stream resolves false only for fresh Azure Responses. Explicit Chat and local providers retain Stream=true; explicit Responses Stream=true still fails before HTTP. Saved protocol/Stream take precedence; legacy projects without protocol retain Chat unless explicitly selected. No streaming/local Responses implementation, token/time default change or fallback.
+- Source SHA256 `19b3aae3d9b961a87aa453cb3e1b2456535a06ac11936658253cbffa60a44fea`, product delta +10/-2. Internal callable dispatcher/resolver defaults remain Chat for backward compatibility; original public entry resolves/saves the effective Responses default.
+- Native5.1/7 meaningful RED before source edit, then each GREEN: defaults12, core13, Responses16, HTTP4, controlled installed-module budget4, export11; five local startup gates. Hash-identical full original filepath with provider/protocol/Stream omitted: fresh and retained-response each10 synthetic POSTs. Saved Responses, saved Chat and legacy recovery each0 POST with transport forbidden; state and Stream read back. Failure replay4 synthetic POSTs,3 denied later attempts. Python ast.parse84 actual exported files across final/repeated entry evidence; none executed.
+- Changes remain **local, uncommitted, pending remote delivery**. No fresh inference, installs, CI/AIPSTeam edits, security/User setting changes, commit/push, publication or owner-checkout activation. Full-entry fixtures/control transport are not real TLS/provider qualification; budget preserves guarded installed PSAOAI bytes. Previous live/source hashes below are historical, not live qualification of this new hash.
+- Evidence `/home/voytas/.hermes/cache/scratch/aipyteam-stabilization/azure-defaults/REPORT.md`, `summary.json`, `red-valid/`, `final/`, `entry-final/`, matrices, source-bound receipts and `slice.diff`. Initial `red/` contains a corrected harness extraction error, not valid product RED. Usage: [Azure Responses](azure-responses.md).
+
+## Historical checkpoints
+
 Baseline: clean master 649d692. Scope: source-bound dispatch, Python export, legacy load/save and offline local startup/resume. No CI edits, dependency installs, inference, commits or publication.
 
 ## Completed slices
