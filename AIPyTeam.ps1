@@ -1019,7 +1019,7 @@ $($GlobalState.LastpydevCode)
     catch [System.Exception] {
         # Handle any exceptions that occur during the process
         $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
+        throw
     }
 }
 
@@ -1030,6 +1030,7 @@ function Update-GlobalStateWithResponse {
     )
 
     try {
+        if ([string]::IsNullOrWhiteSpace($response)) { throw "Empty draft response; last good code retained." }
         # Update the global response with the new response
         $GlobalState.GlobalpydevResponse += $response
 
@@ -1039,7 +1040,7 @@ function Update-GlobalStateWithResponse {
         # Save the new version of the code to a file
         $_savedFile = Export-AndWritePythonCodeBlocks -InputString $response -OutputFilePath $(join-path $GlobalState.teamDiscussionDataFolder "TheCode_v$($GlobalState.fileVersion).py") -StartDelimiter '```python' -EndDelimiter '```'
 
-        if ((Test-Path -Path $_savedFile) -and $_savedFile) {
+        if ($_savedFile -and (Test-Path -Path $_savedFile)) {
             # Update the last code and file version
             $GlobalState.lastpydevCode = Get-Content -Path $_savedFile -Raw
             $GlobalState.fileVersion += 1
@@ -1048,12 +1049,12 @@ function Update-GlobalStateWithResponse {
             Write-Verbose $_savedFile
         }
         else {
-            Write-Warning "!! The code does not exist. Unable to update the last code and file version."
+            throw "Draft export failed; last good code retained."
         }
     }
     catch [System.Exception] {
         $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
+        throw
     }
 }
 
@@ -1093,7 +1094,7 @@ function Invoke-ProcessFeedbackAndResponse {
     }    
     catch [System.Exception] {
         $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
+        throw
     }
 }
 
@@ -1109,7 +1110,7 @@ function Save-AndUpdateCode {
     }    
     catch [System.Exception] {
         $functionName = $MyInvocation.MyCommand.Name
-        Update-ErrorHandling -ErrorRecord $_ -ErrorContext "$functionName function" -LogFilePath (Join-Path $GlobalState.TeamDiscussionDataFolder "ERROR.txt")  
+        throw
     }
 }
 
@@ -1142,6 +1143,12 @@ function Get-ProjectState {
             $projectState = Import-Clixml -Path $FilePath -ErrorAction Stop
             if ($null -eq $projectState.LLMProvider) {
                 $projectState | Add-Member -NotePropertyName LLMProvider -NotePropertyValue "AzureOpenAI" -Force
+            }
+            foreach ($field in @('WorkflowOutcome','FailedStage','WorkflowErrorCode')) {
+                if (-not $projectState.PSObject.Properties[$field]) {
+                    $default = if ($field -eq 'WorkflowOutcome') { 'NotRecorded' } else { '' }
+                    $projectState | Add-Member -NotePropertyName $field -NotePropertyValue $default
+                }
             }
             # Return the updated GlobalState object
             return $projectState
@@ -2566,6 +2573,9 @@ if (-not $LoadProjectStatus) {
         GlobalResponse           = @()
         FileVersion              = 1
         LastpydevCode            = ""
+        WorkflowOutcome         = "NotRecorded"
+        FailedStage             = ""
+        WorkflowErrorCode       = ""
         GlobalpydevResponse      = @()
         OrgUserInput             = ""
         UserInput                = ""
@@ -3208,6 +3218,8 @@ $($RAGresponse.trim())
 }
 
 if (-not $LoadProjectStatus) {
+    $workflowStage = "Manager"
+    try {
     #region PM-pydev
     $userInputOryginal = $userInput
     $GlobalState.OrgUserInput = $userInputOryginal
@@ -3255,6 +3267,7 @@ $($($GlobalState.userInput).trim())
         $PythonDeveloperPrompt += "`n`nNote: There is `$50 tip for this task."
     }
 
+    $workflowStage = "Developer"
     $PythonDeveloperResponce = $PythonDeveloper.ProcessInput($PythonDeveloperPrompt)
 
     #$GlobalState.GlobalpydevResponse += $PythonDeveloperResponce
@@ -3264,6 +3277,7 @@ $($($GlobalState.userInput).trim())
     #endregion PM-pydev
 
     #region RA-pydev
+    $workflowStage = "Analyst/Developer"
     #Invoke-ProcessFeedbackAndResponse -role $requirementsAnalyst -description $GlobalState.userInput -code $lastpydevCode -tipAmount 100 -globalResponse ([ref]$GlobalpydevResponse) -lastCode ([ref]$lastpydevCode) -fileVersion ([ref]$FileVersion) -teamDiscussionDataFolder $GlobalState.TeamDiscussionDataFolder
     if ($GlobalState.NOTips) {
         Invoke-ProcessFeedbackAndResponse -reviewer $requirementsAnalyst -recipient $PythonDeveloper -GlobalState $GlobalState
@@ -3274,6 +3288,7 @@ $($($GlobalState.userInput).trim())
     #endregion RA-pydev
 
     #region SA-pydev
+    $workflowStage = "Architect/Developer"
     if ($GlobalState.NOTips) {
         Invoke-ProcessFeedbackAndResponse -reviewer $systemArchitect -recipient $PythonDeveloper -GlobalState $GlobalState
     }
@@ -3284,6 +3299,7 @@ $($($GlobalState.userInput).trim())
     #endregion SA-pydev
 
     #region DE-pydev
+    $workflowStage = "Domain Expert/Developer"
     if ($GlobalState.NOTips) {
         Invoke-ProcessFeedbackAndResponse -reviewer $domainExpert -recipient $PythonDeveloper -GlobalState $GlobalState
     }
@@ -3293,6 +3309,7 @@ $($($GlobalState.userInput).trim())
     #endregion DE-pydev
 
     #region QAE-pydev
+    $workflowStage = "QA/Developer"
     if ($GlobalState.NOTips) {
         Invoke-ProcessFeedbackAndResponse -reviewer $qaEngineer -recipient $PythonDeveloper -GlobalState $GlobalState
     }
@@ -3302,6 +3319,7 @@ $($($GlobalState.userInput).trim())
     #endregion QAE-pydev
 
     #region Doc
+    $workflowStage = "Documentation"
     if (-not $GlobalState.NODocumentator) {
         if (-not $GlobalState.NOLog) {
             $documentationSpecialistResponce = $documentationSpecialist.ProcessInput($GlobalState.lastpydevCode) 
@@ -3315,6 +3333,7 @@ $($($GlobalState.userInput).trim())
     #endregion Doc
 
     #region PM Project report
+    $workflowStage = "Project report"
     if (-not $GlobalState.NOPM) {
         # Example of summarizing all steps,  Log final response to file
         if (-not $GlobalState.NOLog) {
@@ -3329,6 +3348,15 @@ $($($GlobalState.userInput).trim())
         Add-ToGlobalResponses $GlobalState $projectManagerResponse
     }
     #endregion PM Project report
+    $GlobalState.WorkflowOutcome = 'Completed'
+    $GlobalState.FailedStage = ''
+    $GlobalState.WorkflowErrorCode = ''
+    } catch {
+        $GlobalState.WorkflowOutcome = if ([string]::IsNullOrWhiteSpace($GlobalState.LastpydevCode)) { 'Failed' } else { 'Partial' }
+        $GlobalState.FailedStage = $workflowStage
+        $GlobalState.WorkflowErrorCode = 'StageFailed'
+        Write-Warning "Workflow $($GlobalState.WorkflowOutcome); stopped at $workflowStage. No automatic continuation."
+    }
 }
 #region Menu
 
@@ -3606,7 +3634,9 @@ do {
 if (-not $GlobalState.NOLog) {
     # Log Developer last memory
     $TheFinalCodeFullName = Join-Path $GlobalState.TeamDiscussionDataFolder "TheCodeF.py"
-    $GlobalState.lastpydevCode | Out-File -FilePath $TheFinalCodeFullName -Encoding UTF8 -ErrorAction Stop
+    if (-not [string]::IsNullOrWhiteSpace($GlobalState.lastpydevCode)) {
+        $GlobalState.lastpydevCode | Out-File -FilePath $TheFinalCodeFullName -Encoding UTF8 -ErrorAction Stop
+    }
     if (Test-Path -Path $TheFinalCodeFullName) {
         # Call the function to check the code in 'TheCode.py' file
         Write-Information "++ The final code was exported to $TheFinalCodeFullName" -InformationAction Continue
@@ -3624,6 +3654,15 @@ if ($saved) {
     Write-Host "++ You can resume working on this project at any time by loading the saved state. Just run:`nAIPyTeam.ps1 -LoadProjectStatus `"$ProjectfilePath`"`n`n"
 }
 
+if (-not $saved) {
+    if ($GlobalState.WorkflowOutcome -eq 'Completed') {
+        $GlobalState.WorkflowOutcome = if ([string]::IsNullOrWhiteSpace($GlobalState.LastpydevCode)) { 'Failed' } else { 'Partial' }
+        $GlobalState.FailedStage = 'SaveProjectState'
+        $GlobalState.WorkflowErrorCode = 'StateSaveFailed'
+    }
+    Write-Warning "Project state was not saved; workflow outcome: $($GlobalState.WorkflowOutcome)."
+}
+Write-Host "Workflow outcome: $($GlobalState.WorkflowOutcome); failed stage: $($GlobalState.FailedStage)"
 Write-Host "Exiting..."
 
 # Ensure to reset the culture back to the original after the script execution

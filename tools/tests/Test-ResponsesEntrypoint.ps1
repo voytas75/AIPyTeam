@@ -1,4 +1,4 @@
-param([string]$RepositoryRoot,[string]$EvidenceRoot,[switch]$Resume,[switch]$RetainedResponse,[switch]$DefaultAzure,[ValidateSet('Responses','ChatCompletions','Legacy')][string]$RecoveryProtocol='Responses')
+param([string]$RepositoryRoot,[string]$EvidenceRoot,[switch]$Resume,[switch]$RetainedResponse,[switch]$DefaultAzure,[ValidateSet('Responses','ChatCompletions','Legacy')][string]$RecoveryProtocol='Responses',[switch]$PartialRecovery)
 $ErrorActionPreference='Stop'
 New-Item -ItemType Directory -Force $EvidenceRoot|Out-Null
 $modules=Join-Path $EvidenceRoot 'modules'
@@ -24,6 +24,7 @@ $entry=Join-Path $RepositoryRoot 'AIPyTeam.ps1'
 if($Resume){
  $folder=Join-Path $EvidenceRoot project;New-Item -ItemType Directory -Force $folder|Out-Null
  $state=[pscustomobject]@{TeamDiscussionDataFolder=$folder;GlobalResponse=@();FileVersion=1;LastpydevCode='x = 1';GlobalpydevResponse=@();OrgUserInput='synthetic';UserInput='synthetic';LogFolder=$EvidenceRoot;MaxTokens=256;VerbosePrompt=$false;NOTips=$true;NOLog=$false;NODocumentator=$true;NOPM=$true;RAG=$false;Stream=$false;LLMProvider='AzureOpenAI';AzureOpenAIProtocol='Responses';AzureResponsesTimeoutSec=60}
+ if($PartialRecovery){$state|Add-Member WorkflowOutcome Partial;$state|Add-Member FailedStage 'Analyst/Developer';$state|Add-Member WorkflowErrorCode StageFailed}
  $xml=Join-Path $folder Project.xml;$state|Export-Clixml $xml
  if($RecoveryProtocol -eq 'Legacy'){$state.PSObject.Properties.Remove('AzureOpenAIProtocol');$state.Stream=$true}
  elseif($RecoveryProtocol -eq 'ChatCompletions'){$state.AzureOpenAIProtocol='ChatCompletions';$state.Stream=$true}
@@ -42,6 +43,9 @@ $saved=Import-Clixml $projects[0].FullName
 $expectedProtocol=if($Resume -and $RecoveryProtocol -ne 'Responses'){'ChatCompletions'}else{'Responses'}
 $expectedStream=($Resume -and $RecoveryProtocol -ne 'Responses')
 if($saved.AzureOpenAIProtocol -ne $expectedProtocol -or $saved.Stream -ne $expectedStream -or $saved.AzureResponsesTimeoutSec -ne 60 -or $saved.LLMProvider -ne 'AzureOpenAI'){throw 'Saved protocol/stream/budget changed'}
+if($PartialRecovery){if($saved.WorkflowOutcome -ne 'Partial' -or $saved.FailedStage -ne 'Analyst/Developer' -or $saved.WorkflowErrorCode -ne 'StageFailed'){throw 'Recovery cleared partial outcome'}}
+elseif($Resume){if($saved.WorkflowOutcome -ne 'NotRecorded'){throw 'Recovery invented historical completion'}}
+else{if($saved.WorkflowOutcome -ne 'Completed' -or $saved.FailedStage -or $saved.WorkflowErrorCode){throw 'Success outcome incorrect'}}
 $final=Join-Path $saved.TeamDiscussionDataFolder TheCodeF.py
 $code=Get-Content $final -Raw
 if($RetainedResponse){if($code -notmatch 'def greet' -or $code -notmatch 'def main' -or $code -match 'import greet|subprocess|unittest|Path\("greet.py"\)'){throw 'Retained export contaminated'};if($saved.LastpydevCode.Trim() -ne $code.Trim()){throw 'Saved production mismatch'}}

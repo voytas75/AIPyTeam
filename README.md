@@ -71,7 +71,7 @@ By leveraging the Bing Web Search API, the AI Python Team can provide enhanced s
 - **Documentation Generation**: Automatically generates comprehensive documentation for the project.
 - **Code Analysis**: Integrates with PSScriptAnalyzer for code quality checks.
 - **Feedback Integration**: Collects and integrates feedback from team members to improve the response.
-- **State Management**: Manages global state across different stages of the project.
+- **State Management**: Manages global state across different stages of the project. Saved `Project.xml` records `WorkflowOutcome` (`Completed`, `Partial`, `Failed`, or legacy `NotRecorded`), `FailedStage`, and a fixed safe `WorkflowErrorCode`. A failed stage stops automatic downstream work; a last-good draft remains available for inspection/save in the menu. `Partial` means a retained draft, not a completed or runnable project. Initial failure without a draft is `Failed`; no empty final Python file is written. Loading a project preserves its outcome and does not certify completion. Explicit menu operations remain available but do not retroactively complete an interrupted workflow. Failed state saving is reported separately and never announced as completed.
 - **Error Handling**: Robust error handling mechanisms to capture and log errors.
 - **Version Control**: Saves and updates code versions with detailed logs.
 - **Interactive Menu**: Provides an interactive menu for suggesting new features, analyzing code, generating documentation, and more.
