@@ -33,7 +33,7 @@ Startup requests `/models` with a Bearer header and selects the first returned m
 
 ## Ollama
 
-Start Ollama and a model outside AIPyTeam first. `OLLAMA_ENDPOINT` resolves Process → User → `http://localhost:11434/` and is normalized with a trailing slash. The active startup path checks the API and running model; it fails when none is running. In NOInteraction it uses the discovered running model directly, rather than prompting to start/select one. Do not assume merely setting `OLLAMA_MODEL` starts or selects a model in this path.
+Start Ollama and a model outside AIPyTeam first. The first nonblank value wins in this order: `OLLAMA_ENDPOINT` Process → User, then `OLLAMA_HOST` Process → User, then `http://localhost:11434/`. Thus a User `OLLAMA_ENDPOINT` still takes precedence over a Process `OLLAMA_HOST`. Whitespace-only values are skipped; surrounding whitespace is trimmed and one trailing slash is normalized after selection. Startup resolution does not persist environment settings. `OLLAMA_HOST` is an endpoint fallback, not a new model-selection setting; no scheme or port is inferred. The active startup path checks the API and running model; it fails when none is running. In NOInteraction it uses the discovered running model directly, rather than prompting to start/select one. Do not assume merely setting `OLLAMA_MODEL` starts or selects a model in this path.
 
 ```powershell
 $env:OLLAMA_ENDPOINT = 'http://localhost:11434/'

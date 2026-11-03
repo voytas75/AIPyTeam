@@ -1,17 +1,25 @@
 # AI Python Team with RAG - release notes
 
+> **Unreleased next-version work:** this GitHub source includes offline-qualified backlog delivered to the repository, not a PowerShell Gallery release. Script version remains **0.1.0**; the next version is not selected. Current bytes are not freshly live-qualified.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## Unreleased — next release provisional; version not selected
+
+- Bounded Ollama endpoint compatibility: first nonblank `OLLAMA_ENDPOINT` (Process → User), then `OLLAMA_HOST` (Process → User), then localhost default; trim whitespace and normalize one trailing slash after selection. No persistent environment writes or model/transport changes.
+- Focused source-bound RED/GREEN: 13 cases on Linux PowerShell 7 and native Windows PowerShell 5.1/7; original source failed 7, changed source passes all 13 on each runtime. Synthetic environment reads only, no provider requests.
+- Script version remains 0.1.0. The final offline qualification is recorded in the stabilization tracker; GitHub delivery is not live acceptance, owner checkout activation or Gallery publication. Prior package/source bindings do not qualify these bytes.
+
 ## [0.1.0] — beta, current source; publication not verified
 
-### Pending local mode changes
+### Qualified mode changes — unreleased GitHub source
 
 - Approved NOInteraction disables AIPyTeam prompts/menu, validates active Process configuration and supports deterministic XML recovery; dependency #Requires resolution remains earlier.
 - Approved ReducedWorkflow persists Manager/Developer-only generation, skipping review pairs and optional reports without implicitly disabling RAG.
 - Native offline acceptance records seven suites / 85 cases per runtime; generated Python remains unexecuted.
-- These changes remain uncommitted and supersede the old source-bound publication handoff. No version bump, rebuilt package or confirmed Gallery upload is implied.
+- These changes are delivered to GitHub as unreleased backlog and supersede the old source-bound publication handoff. No version bump, rebuilt package or confirmed Gallery upload is implied.
 
 ### Earlier 0.1.0 preparation
 

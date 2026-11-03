@@ -1,5 +1,7 @@
 # AI Python Team (AIPyTeam)
 
+> **Unreleased next-version work:** this GitHub source includes offline-qualified backlog delivered to the repository, not a PowerShell Gallery release. Script version remains **0.1.0**; the next version is not selected. Current bytes are not freshly live-qualified.
+
 AIPyTeam is a PowerShell-driven Python draft generator. It simulates a team of agents that propose requirements, code, review feedback and documentation using Azure OpenAI, Ollama, LM Studio or llama.cpp, with optional web retrieval.
 
 **Beta:** generated Python requires human review and testing. AIPyTeam does not execute it or certify production readiness. Prompts, code and retrieved context may be sent to providers; do not include secrets or sensitive data without authorization.
@@ -21,7 +23,7 @@ Install-Module -Name PSAOAI -MinimumVersion 0.3.2 -Scope CurrentUser
 Install-Module -Name PowerHTML -Scope CurrentUser
 ```
 
-Run `AIPyTeam.ps1` from a checkout directory. The documentation describes the **current local script**, including the approved, uncommitted `NOInteraction`, `ReducedWorkflow` and llama.cpp changes. Its version remains 0.1.0; this is not a claim that 0.1.0 or these modes are published.
+Run `AIPyTeam.ps1` from a checkout directory. The documentation describes the **current GitHub source**, including the approved `NOInteraction`, `ReducedWorkflow` and llama.cpp changes. Its version remains 0.1.0; this is not a claim that 0.1.0 or these modes are published.
 
 ```powershell
 Install-Script -Name AIPyTeam -Scope CurrentUser

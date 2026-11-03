@@ -2853,9 +2853,11 @@ if ($GlobalState.LLMProvider -eq 'AzureOpenAI') {
 #region ollama
 if ($GlobalState.LLMProvider -eq 'ollama') {
     $script:ollamaEndpoint = $env:OLLAMA_ENDPOINT
-    if (-not $script:ollamaEndpoint) { $script:ollamaEndpoint = [Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'User') }
-    if (-not $script:ollamaEndpoint) { $script:ollamaEndpoint = 'http://localhost:11434/' }
-    $script:ollamaEndpoint = $script:ollamaEndpoint.TrimEnd('/') + '/'
+    if ([string]::IsNullOrWhiteSpace($script:ollamaEndpoint)) { $script:ollamaEndpoint = [Environment]::GetEnvironmentVariable('OLLAMA_ENDPOINT', 'User') }
+    if ([string]::IsNullOrWhiteSpace($script:ollamaEndpoint)) { $script:ollamaEndpoint = $env:OLLAMA_HOST }
+    if ([string]::IsNullOrWhiteSpace($script:ollamaEndpoint)) { $script:ollamaEndpoint = [Environment]::GetEnvironmentVariable('OLLAMA_HOST', 'User') }
+    if ([string]::IsNullOrWhiteSpace($script:ollamaEndpoint)) { $script:ollamaEndpoint = 'http://localhost:11434/' }
+    $script:ollamaEndpoint = $script:ollamaEndpoint.Trim().TrimEnd('/') + '/'
     if (-not (Test-OllamaAPI)) { throw 'Ollama API is not reachable.' }
     $runningModelOllama = Test-OllamaRunningModel
     if (-not $runningModelOllama) { throw 'No running Ollama model.' }
