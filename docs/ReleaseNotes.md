@@ -1,12 +1,18 @@
 # AI Python Team with RAG - release notes
 
-> **Unreleased next-version work:** this GitHub source includes offline-qualified backlog delivered to the repository, not a PowerShell Gallery release. Script version remains **0.1.0**; the next version is not selected. Current bytes are not freshly live-qualified.
+> **Planned 0.1.1 — UNRELEASED:** this GitHub source includes offline-qualified changes intended for 0.1.1, not a new PowerShell Gallery release. Script metadata remains **0.1.0**. Current bytes are not freshly live-qualified; Gallery availability was not rechecked for this documentation-only preparation.
 
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## Unreleased — next release provisional; version not selected
+## [0.1.1] — planned, UNRELEASED
+
+- Ollama endpoint compatibility only: first nonblank `OLLAMA_ENDPOINT` (Process → User), then `OLLAMA_HOST` (Process → User), then `http://localhost:11434/`; normalize after selection and retain saved-provider recovery. No model-selection or transport change, new token/timeout forwarding, Markdown-heading exporter repair or AIPSTeam feature-parity claim.
+- Final source SHA256 `b2b60cd253b5089ed2c2a22b54c0a402830b241b9b1aa74ee4acb55a3d04c006` is offline-qualified on native Windows PowerShell 5.1/7, including controlled original-entry startup/recovery. Recovery is discovery-only; generated Python was syntax-parsed, not executed. Current bytes have no fresh live qualification.
+- Script metadata remains 0.1.0; Gallery availability remains unverified here. No version bump, package, publication or owner-checkout activation is implied.
+
+### Historical qualification checkpoints for endpoint compatibility
 
 - Bounded Ollama endpoint compatibility: first nonblank `OLLAMA_ENDPOINT` (Process → User), then `OLLAMA_HOST` (Process → User), then localhost default; trim whitespace and normalize one trailing slash after selection. No persistent environment writes or model/transport changes.
 - Focused source-bound RED/GREEN: 13 cases on Linux PowerShell 7 and native Windows PowerShell 5.1/7; original source failed 7, changed source passes all 13 on each runtime. Synthetic environment reads only, no provider requests.

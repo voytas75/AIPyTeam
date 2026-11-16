@@ -1,16 +1,18 @@
 # Bounded stabilization checkpoint
 
-## Current owner decision — UNRELEASED BACKLOG delivered to GitHub, release work paused
+## Current owner decision — planned 0.1.1, UNRELEASED; documentation preparation only
 
-All current qualified changes are **offline-qualified UNRELEASED BACKLOG delivered to GitHub**, intended for a future version, not released on PowerShell Gallery. This decision supersedes earlier active/next-gate wording below; historical qualification receipts and limitations are preserved. Actual version remains **0.1.0**; no next version is chosen, and proposed **0.1.1 is not approved**. Final offline qualification remains bound to source SHA256 `b2b60cd253b5089ed2c2a22b54c0a402830b241b9b1aa74ee4acb55a3d04c006`.
+All current qualified changes are **offline-qualified UNRELEASED BACKLOG delivered to GitHub**, intended for a future version, not released on PowerShell Gallery. This decision supersedes earlier active/next-gate wording below; historical qualification receipts and limitations are preserved. The owner selected **0.1.1** as the planned **UNRELEASED** version. Source version metadata remains **0.1.0**; this is not a version bump or Gallery publication. Final offline qualification remains bound to source SHA256 `b2b60cd253b5089ed2c2a22b54c0a402830b241b9b1aa74ee4acb55a3d04c006`.
 
-The owner approved scoped commit/push of the qualified backlog and this repository indication. This supersedes the earlier delivery prohibition only; historical no-publication qualification receipts remain unchanged. No release packaging, version bump, CI changes, live calls, installation, owner-checkout synchronization or PowerShell Gallery publication is authorized. Release work remains paused; no issue closure is implied.
+The owner approved scoped commit/push of the qualified backlog and this repository indication. This supersedes the earlier delivery prohibition only; historical no-publication qualification receipts remain unchanged. No release packaging, version bump, CI changes, live calls, installation, owner-checkout synchronization or PowerShell Gallery publication is authorized. Only local documentation preparation for planned 0.1.1 is now authorized; prior commit/push approval was already executed and does not authorize another delivery. No issue closure is implied.
 
 Live limitation: current source remains **live NOT QUALIFIED**. Historical adapter/transport successes do not qualify the current full workflow or generated artifact; the historical full120 run completed transport but failed self-contained artifact acceptance, with its export repair qualified offline only. Current Ollama entry/recovery evidence is synthetic, and recovery remains discovery-only. Previous publication/handoff bindings remain historical/invalid for current bytes.
 
 ## Historical stabilization checkpoints
 
-## Active checkpoint: approved Ollama endpoint compatibility (local next-release candidate)
+<a id="active-checkpoint-approved-ollama-endpoint-compatibility-local-next-release-candidate"></a>
+
+## Historical checkpoint: approved Ollama endpoint compatibility (local next-release candidate)
 - Baseline clean `c3936464204df06b131ebd5467938cb7edbddc8d`. Approved scope: startup selection only, focused source-bound tests, provider/release documentation and this operational tracker; prior history preserved. Next release is **provisional, version not selected**; script metadata remains 0.1.0.
 - Contract: first nonblank OLLAMA_ENDPOINT Process → User, then OLLAMA_HOST Process → User, then `http://localhost:11434/`. Existing name-first Process/User semantics preserved; whitespace-only candidates skipped, surrounding whitespace trimmed and one trailing slash normalized only after selection. No persistent environment writes, model-selection changes or scheme/port inference.
 - RED before fix: Linux PowerShell 7.6.8 and native Windows PowerShell 5.1.26100.9711 / 7.6.9 each 13 cases, 7 failures (host fallback and whitespace). GREEN exact final source/runner: each 13/13, exit 0; product AST parser clean on all three. Synthetic read interception runs the original extracted startup selection from a scratch filepath; no actual environment values/stores consulted, no transport/module imports.

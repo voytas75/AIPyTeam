@@ -1,6 +1,6 @@
 # AI Python Team (AIPyTeam)
 
-> **Unreleased next-version work:** this GitHub source includes offline-qualified backlog delivered to the repository, not a PowerShell Gallery release. Script version remains **0.1.0**; the next version is not selected. Current bytes are not freshly live-qualified.
+> **Planned 0.1.1 — UNRELEASED:** this GitHub source includes offline-qualified changes intended for 0.1.1, not a new PowerShell Gallery release. Script metadata remains **0.1.0**. Current bytes are not freshly live-qualified; Gallery availability was not rechecked for this documentation-only preparation.
 
 AIPyTeam is a PowerShell-driven Python draft generator. It simulates a team of agents that propose requirements, code, review feedback and documentation using Azure OpenAI, Ollama, LM Studio or llama.cpp, with optional web retrieval.
 
